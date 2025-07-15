@@ -1,0 +1,10 @@
+{
+  "canisters": {
+    "send_http_get_backend": {
+      "main": "src/send_http_get_backend/main.mo",
+      "type": "motoko"
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

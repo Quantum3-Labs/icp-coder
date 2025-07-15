@@ -1,0 +1,11 @@
+chromadb
+openai
+fastapi
+uvicorn
+requests
+beautifulsoup4
+tqdm
+python-dotenv 
+sentence-transformers
+tqdm
+google-generativeai
