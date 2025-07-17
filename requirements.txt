@@ -7,3 +7,4 @@ tqdm==4.66.5
 python-dotenv==1.0.1
 sentence-transformers==4.1.0
 google-generativeai==0.8.5
+uvicorn==0.32.0
