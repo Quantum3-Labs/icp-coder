@@ -24,53 +24,44 @@ def get_metadata(file_path, base_dir, has_toml=False):
         "rel_path": rel_path,
         "file_type": "motoko" if filename.endswith(".mo") else "toml"
     }
-    
-    # Add .toml indicator if a .toml file is present in the project
-    if has_toml:
-        metadata["has_toml"] = True
-    else:
-        metadata["has_toml"] = False
-        
+    # Add .toml indicator if a mops.toml file is present in the project
+    metadata["has_toml"] = has_toml
     return metadata
 
 def find_project_files(samples_dir):
-    """Find all .mo and .toml files in the samples directory."""
+    """Find all .mo files and mops.toml files in the samples directory."""
     mo_files = []
-    toml_files = []
-    project_toml_map = {}  # Map project directories to their .toml files
-    
+    mops_toml_files = []
+    project_toml_map = {}  # Map project directories to their mops.toml file
     for root, _, files in os.walk(samples_dir):
         for file in files:
             file_path = os.path.join(root, file)
             if file.endswith(".mo"):
                 mo_files.append(file_path)
-            elif file.endswith(".toml"):
-                toml_files.append(file_path)
-                # Store the project directory (parent of the .toml file)
+            elif file == "mops.toml":
+                mops_toml_files.append(file_path)
+                # Store the project directory (parent of the mops.toml file)
                 project_dir = os.path.dirname(file_path)
                 project_toml_map[project_dir] = file_path
-    
-    return mo_files, toml_files, project_toml_map
+    return mo_files, mops_toml_files, project_toml_map
 
 def main():
     chroma_dir = os.path.join(os.getcwd(), "chromadb_data")
     chroma_client = chromadb.PersistentClient(path=chroma_dir)
     collection = chroma_client.get_or_create_collection("motoko_code_samples")
 
-    # Find all .mo and .toml files
-    mo_files, toml_files, project_toml_map = find_project_files(SAMPLES_DIR)
-    print(f"Found {len(mo_files)} .mo files and {len(toml_files)} .toml files.")
+    # Find all .mo and mops.toml files
+    mo_files, mops_toml_files, project_toml_map = find_project_files(SAMPLES_DIR)
+    print(f"Found {len(mo_files)} .mo files and {len(mops_toml_files)} mops.toml files.")
 
     docs, embeddings, metadatas, ids = [], [], [], []
     i = 0
-    
     # Process .mo files first
     print("Processing .mo files...")
     for file_path in tqdm(mo_files, desc="Processing .mo files", unit="file"):
-        # Check if this .mo file's project has a .toml file
+        # Check if this .mo file's project has a mops.toml file
         project_dir = os.path.dirname(file_path)
         has_toml = project_dir in project_toml_map
-        
         with open(file_path, "r", encoding="utf-8") as f:
             code = f.read()
         meta = get_metadata(file_path, SAMPLES_DIR, has_toml)
@@ -81,10 +72,9 @@ def main():
         ids.append(f"motoko_sample_{i}")
         print(f"Metadata for embedding {i}: {meta}")
         i += 1
-    
-    # Process .toml files
-    print("Processing .toml files...")
-    for file_path in tqdm(toml_files, desc="Processing .toml files", unit="file"):
+    # Process mops.toml files
+    print("Processing mops.toml files...")
+    for file_path in tqdm(mops_toml_files, desc="Processing mops.toml files", unit="file"):
         with open(file_path, "r", encoding="utf-8") as f:
             toml_content = f.read()
         meta = get_metadata(file_path, SAMPLES_DIR, has_toml=True)
@@ -95,8 +85,7 @@ def main():
         ids.append(f"toml_sample_{i}")
         print(f"Metadata for embedding {i}: {meta}")
         i += 1
-
-    print(f"Storing {len(docs)} total files (Motoko + TOML) in ChromaDB...")
+    print(f"Storing {len(docs)} total files (Motoko + mops.toml) in ChromaDB...")
     collection.add(
         documents=docs,
         embeddings=embeddings,

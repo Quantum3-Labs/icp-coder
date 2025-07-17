@@ -3,7 +3,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
-import database
+from . import database
 from datetime import datetime
 
 app = FastAPI(title="Motoko Coder Auth API", version="1.0.0")
