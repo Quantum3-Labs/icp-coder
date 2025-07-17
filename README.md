@@ -12,7 +12,7 @@ A Retrieval-Augmented Generation (RAG) pipeline for Motoko code search and code 
 - MCP (Model Context Protocol) server for Cursor/VS Code integration
 
 ## Requirements
-- Python 3.9- [ChromaDB](https://www.trychroma.com/)
+- Python 3.11- [ChromaDB](https://www.trychroma.com/)
 - [sentence-transformers](https://www.sbert.net/)
 -tqdm](https://tqdm.github.io/) (for progress bars)
 - [python-dotenv](https://pypi.org/project/python-dotenv/) (for loading environment variables)
