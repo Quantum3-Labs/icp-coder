@@ -36,6 +36,10 @@ This will index all `.mo` and `mops.toml` files in `motoko_code_samples/` and st
 python ingest/motoko_samples_ingester.py
 ```
 
+
+https://github.com/user-attachments/assets/17ba2100-6a17-4d76-879f-df43cdbbb3a8
+
+
 ### 2. Start the API System
 ```bash
 # Terminal 1: Authentication server (port 8001)
@@ -55,6 +59,12 @@ python -m uvicorn API.mcp_api_server:app --reload --port 9000
 ```bash
 # Run the example client
 python API/client_example.py
+
+
+
+https://github.com/user-attachments/assets/89c3891a-d7be-4de6-b8ec-45b81bc96442
+
+
 
 # Or test the RAG inference directly
 python rag/inference_gemini.py
