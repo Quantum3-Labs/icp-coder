@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 import google.generativeai as genai
-import database
+from . import database
 
 # Load environment variables
 load_dotenv()

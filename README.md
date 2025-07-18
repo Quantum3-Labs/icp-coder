@@ -9,12 +9,13 @@ A Retrieval-Augmented Generation (RAG) pipeline for Motoko code search and code 
 - Retrieval-Augmented Generation (RAG) pipeline for Motoko code search and question answering
 - Supports Google Gemini (via SDK or REST API) for code-related Q&A
 - Complete API system with user authentication and API key management
-- MCP (Model Context Protocol) server for Cursor/VS Code integration
+- MCP (Model Context Protocol) server for Cursor/VS Code integration (supports both process and HTTP modes)
 
 ## Requirements
-- Python 3.11- [ChromaDB](https://www.trychroma.com/)
+- Python 3.11+
+- [ChromaDB](https://www.trychroma.com/)
 - [sentence-transformers](https://www.sbert.net/)
--tqdm](https://tqdm.github.io/) (for progress bars)
+- [tqdm](https://tqdm.github.io/) (for progress bars)
 - [python-dotenv](https://pypi.org/project/python-dotenv/) (for loading environment variables)
 - Google Gemini API key (set `GEMINI_API_KEY` in a `.env` file)
 
@@ -30,17 +31,24 @@ echo GEMINI_API_KEY=your-gemini-key > .env
 ## Quick Start
 
 ### 1. Ingest Motoko Code Samples
-This will index all `.mo` and `.toml` files in `motoko_code_samples/` and store their embeddings and metadata in ChromaDB.
+This will index all `.mo` and `mops.toml` files in `motoko_code_samples/` and store their embeddings and metadata in ChromaDB.
 ```bash
 python ingest/motoko_samples_ingester.py
 ```
 
 ### 2. Start the API System
 ```bash
-# Terminal1: Authentication server (port 8001)
+# Terminal 1: Authentication server (port 8001)
+set PYTHONPATH=.
 python -m uvicorn API.auth_server:app --reload --port 8001
-# Terminal2: RAG API server (port 8000)
+
+# Terminal 2: RAG API server (port 8000)
+set PYTHONPATH=.
 python -m uvicorn API.api_server:app --reload --port 8000
+
+# Terminal 3: MCP HTTP server (port 9000)
+set PYTHONPATH=.
+python -m uvicorn API.mcp_api_server:app --reload --port 9000
 ```
 
 ### 3. Test the System
@@ -59,7 +67,8 @@ ICP_Coder/
 │   ├── api_server.py             # RAG API server (OpenAI-compatible)
 │   ├── auth_server.py            # User authentication server
 │   ├── database.py               # SQLite database operations
-│   ├── mcp_server.py             # MCP server for Cursor/VS Code
+│   ├── mcp_server.py             # MCP process server (stdin/stdout)
+│   ├── mcp_api_server.py         # MCP HTTP server (FastAPI, port 9000)
 │   ├── client_example.py         # Example client
 │   └── README.md                 # API documentation
 ├── ingest/
@@ -86,26 +95,54 @@ ICP_Coder/
 ### RAG API Server (Port 8000)
 - `POST /v1/chat/completions` - Generate Motoko code (requires API key)
 
-### MCP Server
-- `get_motoko_context` - Retrieve relevant Motoko code context
+### MCP HTTP Server (Port 9000)
+- `POST /v1/mcp/context` - Retrieve relevant Motoko code context for RAG (requires API key)
+  - **Request body:**
+    ```json
+    {
+      "query": "How do I write a counter canister in Motoko?",
+      "api_key": "YOUR_API_KEY",
+      "max_results": 5
+    }
+    ```
+  - **Response:** JSON with context snippets, metadata, and status.
 
 ## Integration with Cursor/VS Code
 
 ### As OpenAI-Compatible Endpoint
-1. SetOpenAI Base URL" to: `http://localhost:8001chat/completions`
-2. Use your generated API key
+1. In Cursor/VS Code, go to your LLM extension settings
+2. Set the "OpenAI Base URL" to: `http://localhost:8000/v1/chat/completions`
+3. Set the API key to your generated API key
 
-### As MCP Server
-Configure in Cursor/VS Code MCP settings:
-```json[object Object]mcpServers: {
-    motoko coder": [object Object]      command:python",
-     args: [API/mcp_server.py"],
-      env:[object Object]       PYTHONPATH:."
+### As MCP HTTP Server
+Add to your MCP config (e.g., `mcp.config.json`):
+```json
+{
+  "inputs": [
+    {
+      "id": "motoko_api_key",
+      "type": "secret",
+      "description": "Your Motoko Coder API Key for RAG context"
+    }
+  ],
+  "servers": {
+    "motoko coder": {
+      "type": "http",
+      "url": "http://localhost:9000/v1/mcp/context",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "query": "${input.query}",
+        "api_key": "${inputs.motoko_api_key}",
+        "max_results": 5
       }
     }
   }
 }
 ```
+- This will prompt you for your API key and send it with every context request.
 
 ## Usage Examples
 
@@ -117,11 +154,24 @@ python rag/inference_gemini.py
 
 ### API Usage
 ```bash
-curl -X POST http://localhost:8001/chat/completions" \
+curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_API_KEY" \
-  -d {messages":     {"role": user,content:How do I write a counter canister in Motoko?"}
+  -d '{
+    "messages": [
+      {"role": "user", "content": "How do I write a counter canister in Motoko?"}
     ]
+  }'
+```
+
+### MCP HTTP Usage
+```bash
+curl -X POST http://localhost:9000/v1/mcp/context \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I write a counter canister in Motoko?",
+    "api_key": "YOUR_API_KEY",
+    "max_results": 5
   }'
 ```
 
@@ -142,4 +192,4 @@ GEMINI_API_KEY=your-gemini-api-key-here
 
 ---
 
-**Now you can build Motoko code assistants with Python, ChromaDB, and Gemini!**
+**Now you can build Motoko code assistants with Python, ChromaDB, Gemini, and advanced RAG workflows!**
