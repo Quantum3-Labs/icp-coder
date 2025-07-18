@@ -60,15 +60,14 @@ python -m uvicorn API.mcp_api_server:app --reload --port 9000
 # Run the example client
 python API/client_example.py
 
-
-
-https://github.com/user-attachments/assets/89c3891a-d7be-4de6-b8ec-45b81bc96442
-
-
-
 # Or test the RAG inference directly
 python rag/inference_gemini.py
 ```
+
+
+https://github.com/user-attachments/assets/a36c1945-3605-4b2b-b942-ff0dfc55b6a2
+
+
 
 ## Project Structure
 ```
