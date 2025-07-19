@@ -37,7 +37,10 @@ python ingest/motoko_samples_ingester.py
 ```
 
 
-https://github.com/user-attachments/assets/17ba2100-6a17-4d76-879f-df43cdbbb3a8
+
+https://github.com/user-attachments/assets/bd118ebf-ef35-4343-b941-64d743fd285e
+
+
 
 
 ### 2. Start the API System
@@ -65,7 +68,9 @@ python rag/inference_gemini.py
 ```
 
 
-https://github.com/user-attachments/assets/a36c1945-3605-4b2b-b942-ff0dfc55b6a2
+
+https://github.com/user-attachments/assets/5ad15ffe-e095-4585-ae8c-89f8556b6cd2
+
 
 
 
