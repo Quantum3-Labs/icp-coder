@@ -36,11 +36,7 @@ This will index all `.mo` and `mops.toml` files in `motoko_code_samples/` and st
 python ingest/motoko_samples_ingester.py
 ```
 
-
-
-https://github.com/user-attachments/assets/bd118ebf-ef35-4343-b941-64d743fd285e
-
-
+https://www.loom.com/share/9def7522c01b4d7f8b15f2af6b8d442e?sid=910fa0d1-a1b9-4221-8eba-91831617d698
 
 
 ### 2. Start the API System
@@ -67,11 +63,7 @@ python API/client_example.py
 python rag/inference_gemini.py
 ```
 
-
-
-https://github.com/user-attachments/assets/5ad15ffe-e095-4585-ae8c-89f8556b6cd2
-
-
+https://www.loom.com/share/4448fb7d5b9941db9ef13f251149533c?sid=a1e25838-2032-4761-b9d8-23a898f05633
 
 
 ## Project Structure
