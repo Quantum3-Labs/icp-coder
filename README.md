@@ -30,7 +30,14 @@ echo GEMINI_API_KEY=your-gemini-key > .env
 
 ## Quick Start
 
-### 1. Ingest Motoko Code Samples
+### 1. Fetch Motoko Project Samples
+Run the following script to automatically clone a large set of Motoko project samples into the `motoko_code_samples/` directory:
+```bash
+python clone_motoko_repos.py
+```
+This will download many Motoko repositories and add them to `.gitignore` automatically.
+
+### 2. Ingest Motoko Code Samples
 This will index all `.mo` and `mops.toml` files in `motoko_code_samples/` and store their embeddings and metadata in ChromaDB.
 ```bash
 python ingest/motoko_samples_ingester.py
