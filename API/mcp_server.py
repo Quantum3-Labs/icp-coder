@@ -1,212 +1,196 @@
-#!/usr/bin/env python3
-"""
-MCP (Model Context Protocol) Server for Motoko Coder
-Provides RAG context retrieval for Cursor and VS Code LLM enhancement
-"""
-
+# mcp_server.py
+import os
 import json
-import asyncio
-import sys
-from typing import Dict, List, Any, Optional
+import time
+import re
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-import os
-from database import validate_api_key
+import google.generativeai as genai
+from dotenv import load_dotenv
 
-# ChromaDB setup
+# Load environment variables
+load_dotenv()
+
+# ChromaDB Setup
 CHROMA_DIR = os.path.join(os.getcwd(), "chromadb_data")
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-collection = chroma_client.get_or_create_collection("motoko_code_samples")
 embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
-class MotokoCoderMCPServer:
-    """MCP Server for Motoko Coder RAG context retrieval."""
+try:
+    collection = chroma_client.get_collection(
+        name="motoko_code_samples", 
+        embedding_function=embedding_fn
+    )
+    print(f"✅ ChromaDB collection loaded with {collection.count()} Motoko samples")
+except Exception as e:
+    print(f"❌ Error accessing ChromaDB collection: {e}")
+    exit(1)
+
+# Gemini 2.5 Flash Setup
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("❌ Gemini API key not found in environment variables")
+    exit(1)
+
+genai.configure(api_key=GEMINI_API_KEY)
+print("🔌 Connected to Gemini API")
+
+# Gemini model configuration
+GEMINI_MODEL = "models/gemini-2.5-flash"
+GEMINI_CONFIG = {
+    "temperature": 0.7,
+    "max_output_tokens": 8192,
+    "top_p": 0.95,
+    "top_k": 40
+}
+
+def generate_completion_with_context(prompt: str, max_contexts=3) -> str:
+    """Generate completion using Gemini with RAG context"""
+    try:
+        # Retrieve relevant context from ChromaDB
+        results = collection.query(
+            query_texts=[prompt],
+            n_results=max_contexts
+        )
+        
+        # Extract documents and format context
+        context_docs = results['documents'][0] if results['documents'] else []
+        context = "\n\n".join([f"// Reference {i+1}:\n{doc}" for i, doc in enumerate(context_docs)])
+        
+        # Create the full prompt
+        full_prompt = f"""
+        You are an expert Motoko developer. Below are relevant code snippets:
+        
+        {context}
+        
+        Provide a concise code completion for:
+        {prompt}
+        
+        Return ONLY the completion code without explanations.
+        """
+        
+        # Call Gemini API
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(
+            full_prompt,
+            generation_config=genai.types.GenerationConfig(**GEMINI_CONFIG)
+        )
+        
+        # Clean up Gemini response
+        completion_text = response.text.strip()
+        
+        # Remove markdown code blocks if present
+        if completion_text.startswith("```motoko"):
+            completion_text = re.sub(r'^```motoko\s*', '', completion_text, flags=re.IGNORECASE)
+            completion_text = re.sub(r'\s*```\s*$', '', completion_text)
+        
+        return completion_text
     
-    def __init__(self):
-        self.server_name = "motoko-coder-mcp"
-        self.version = "1.0.0"
-        self.capabilities = {
-            "tools": {
-                "listChanged": False,
-                "listRequired": False
+    except Exception as e:
+        print(f"⚠️ Error generating completion: {e}")
+        return ""
+
+class MCPHandler(BaseHTTPRequestHandler):
+    def _set_headers(self, status=200):
+        self.send_response(status)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+    
+    def do_OPTIONS(self):
+        self._set_headers()
+    
+    def do_POST(self):
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        
+        try:
+            json_data = json.loads(post_data)
+        except json.JSONDecodeError:
+            self._set_headers(400)
+            self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
+            return
+        
+        # Handle different MCP endpoints
+        if self.path == '/v1/initialize':
+            print("🔧 Received initialize request")
+            self._handle_initialize()
+        elif self.path == '/v1/completions':
+            self._handle_completions(json_data)
+        else:
+            self._set_headers(404)
+            self.wfile.write(json.dumps({"error": "Endpoint not found"}).encode())
+    
+    def _handle_initialize(self):
+        """Handle Copilot initialization request"""
+        response = {
+            "result": {
+                "name": "Motoko Assistant",
+                "version": "1.0",
+                "capabilities": {
+                    "completions": True,
+                    "completionsInline": True,
+                    "dynamicRegistration": True
+                }
             }
         }
+        self._set_headers()
+        self.wfile.write(json.dumps(response).encode())
+        print("⚡ Initialized successfully")
     
-    def get_motoko_context(self, query: str, api_key: str, max_results: int = 5) -> Dict[str, Any]:
-        """
-        Retrieve relevant Motoko code context based on user query, with API key validation.
-        """
-        # Validate API key
-        valid, user_id, message = validate_api_key(api_key)
-        if not valid:
-            return {
-                "success": False,
-                "error": "Invalid API key",
-                "message": message
-            }
-        try:
-            # Generate query embedding
-            query_emb = embedding_fn([query])[0]
-            # Search for relevant documents
-            results = collection.query(
-                query_embeddings=[query_emb], 
-                n_results=max_results
-            )
-            docs = results.get("documents", [[]])[0]
-            metadatas = results.get("metadatas", [[]])[0]
-            # Format context for MCP
-            context_parts = []
-            for i, (doc, meta) in enumerate(zip(docs, metadatas)):
-                context_part = {
-                    "index": i + 1,
-                    "filename": meta.get("filename", "unknown"),
-                    "project": meta.get("folders", "unknown"),
-                    "file_type": meta.get("file_type", "unknown"),
-                    "has_toml": meta.get("has_toml", False),
-                    "content": doc[:1000] + "..." if len(doc) > 1000 else doc,
-                    "full_path": meta.get("rel_path", "unknown")
-                }
-                context_parts.append(context_part)
-            return {
-                "success": True,
-                "query": query,
-                "context_count": len(context_parts),
-                "context": context_parts,
-                "message": f"Retrieved {len(context_parts)} relevant Motoko code samples"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to retrieve Motoko context"
-            }
+    def _handle_completions(self, data):
+        """Handle completion requests"""
+        start_time = time.time()
+        # Extract Copilot request data
+        prompt = data.get('prompt', '')
+        language_id = data.get('languageId', '')
+        
+        # Only process Motoko code
+        if language_id.lower() != 'motoko':
+            self._set_headers()
+            self.wfile.write(json.dumps({"completions": []}).encode())
+            return
+        
+        # Generate completion with RAG context
+        completion_text = generate_completion_with_context(prompt)
+        
+        if not completion_text:
+            self._set_headers()
+            self.wfile.write(json.dumps({"completions": []}).encode())
+            return
+        
+        # Format completion for MCP
+        completions = [{
+            "text": completion_text,
+            "displayText": self._format_display_text(completion_text),
+            "uuid": self._generate_uuid(),
+        }]
+        
+        latency = int((time.time() - start_time) * 1000)
+        print(f"⏱️ Processed completion in {latency}ms | Prompt: {prompt[:50]}...")
+        
+        self._set_headers()
+        self.wfile.write(json.dumps({"completions": completions}).encode())
     
-    async def handle_mcp_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle MCP protocol requests."""
-        method = request.get("method")
-        params = request.get("params", {})
-        request_id = request.get("id")
-        if method == "initialize":
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": self.capabilities,
-                    "serverInfo": {
-                        "name": self.server_name,
-                        "version": self.version
-                    }
-                }
-            }
-        elif method == "tools/list":
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "result": {
-                    "tools": [
-                        {
-                            "name": "get_motoko_context",
-                            "description": "Retrieve relevant Motoko code context based on user query (API key required)",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "query": {
-                                        "type": "string",
-                                        "description": "User's question or code request about Motoko"
-                                    },
-                                    "api_key": {
-                                        "type": "string",
-                                        "description": "API key for authentication"
-                                    },
-                                    "max_results": {
-                                        "type": "integer",
-                                        "description": "Maximum number of relevant code samples to return (default: 5)",
-                                        "default": 5
-                                    }
-                                },
-                                "required": ["query", "api_key"]
-                            }
-                        }
-                    ]
-                }
-            }
-        elif method == "tools/call":
-            tool_name = params.get("name")
-            arguments = params.get("arguments", {})
-            if tool_name == "get_motoko_context":
-                query = arguments.get("query", "")
-                api_key = arguments.get("api_key", "")
-                max_results = arguments.get("max_results", 5)
-                result = self.get_motoko_context(query, api_key, max_results)
-                return {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "result": {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": json.dumps(result, indent=2)
-                            }
-                        ]
-                    }
-                }
-            else:
-                return {
-                    "jsonrpc": "2.0",
-                    "id": request_id,
-                    "error": {
-                        "code": -32601,
-                        "message": f"Method '{tool_name}' not found"
-                    }
-                }
-        else:
-            return {
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "error": {
-                    "code": -32601,
-                    "message": f"Method '{method}' not found"
-                }
-            }
+    def _format_display_text(self, text: str) -> str:
+        """Extract the first line for display purposes"""
+        return text.split('\n')[0][:50] + "..." if len(text) > 50 else text
+    
+    def _generate_uuid(self) -> str:
+        """Generate a simple UUID for completion items"""
+        return f"uuid-{int(time.time() * 1000)}"
 
-async def main():
-    """Main MCP server loop."""
-    server = MotokoCoderMCPServer()
-    # Read from stdin, write to stdout (MCP protocol)
-    reader = asyncio.StreamReader()
-    protocol = asyncio.StreamReaderProtocol(reader)
-    await asyncio.get_event_loop().connect_read_pipe(lambda: protocol, sys.stdin)
-    writer = asyncio.StreamWriter(
-        asyncio.get_event_loop().connect_write_pipe(
-            lambda: asyncio.StreamReaderProtocol(asyncio.StreamReader()),
-            sys.stdout
-        ).transport,
-        None,
-        None
-    )
-    while True:
-        try:
-            # Read request from stdin
-            line = await reader.readline()
-            if not line:
-                break
-            request = json.loads(line.decode().strip())
-            response = await server.handle_mcp_request(request)
-            # Write response to stdout
-            writer.write((json.dumps(response) + "\n").encode())
-            await writer.drain()
-        except Exception as e:
-            error_response = {
-                "jsonrpc": "2.0",
-                "id": request.get("id") if 'request' in locals() else None,
-                "error": {
-                    "code": -32603,
-                    "message": f"Internal error: {str(e)}"
-                }
-            }
-            writer.write((json.dumps(error_response) + "\n").encode())
-            await writer.drain()
+def run_server(port=9000):
+    server = HTTPServer(('localhost', port), MCPHandler)
+    print(f"\n⚡ MCP Server running on http://localhost:{port}")
+    print("🚀 Ready for Copilot integration")
+    print("🔧 Endpoints:")
+    print(f"  - POST /v1/initialize")
+    print(f"  - POST /v1/completions")
+    server.serve_forever()
 
-if __name__ == "__main__":
-    asyncio.run(main()) 
+if __name__ == '__main__':
+    run_server()

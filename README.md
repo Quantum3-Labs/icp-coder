@@ -72,6 +72,7 @@ python rag/inference_gemini.py
 
 https://www.loom.com/share/4448fb7d5b9941db9ef13f251149533c?sid=a1e25838-2032-4761-b9d8-23a898f05633
 
+https://www.loom.com/share/d1a86a1ea31b4619b189dc656fefcb8a?sid=ca314c26-01fe-4103-9e35-bd1295100a00
 
 ## Project Structure
 ```

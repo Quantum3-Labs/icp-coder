@@ -17,7 +17,7 @@ chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
 collection = chroma_client.get_or_create_collection("motoko_code_samples")
 embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
-app = FastAPI(title="Motoko Coder MCP API", version="1.0.0")
+app = FastAPI(title="ICP_Coder", version="1.0.0")
 
 class MCPContextRequest(BaseModel):
     query: str
@@ -28,6 +28,9 @@ class MCPContextRequest(BaseModel):
 async def get_motoko_context(
     body: MCPContextRequest
 ):
+    # Log the query received from the LLM
+    print("Query received from LLM:", body.query)
+    
     # Validate API key
     valid, user_id, message = validate_api_key(body.api_key)
     if not valid:
@@ -62,6 +65,8 @@ async def get_motoko_context(
             "context": context_parts,
             "message": f"Retrieved {len(context_parts)} relevant Motoko code samples"
         }
+        # Log the context retrieved
+        print("Context retrieved:", response)
         return JSONResponse(content=response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve Motoko context: {str(e)}")
@@ -73,4 +78,4 @@ def root():
         "version": "1.0.0",
         "endpoint": "/v1/mcp/context",
         "authentication": "api_key in POST body required"
-    } 
+    }
