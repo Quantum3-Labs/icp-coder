@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "motoko-coder": {
+      "command": "python",
+      "args": ["MCP_Server/mcp_server.py"],
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+} 
