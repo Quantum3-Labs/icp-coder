@@ -2,6 +2,13 @@
 
 A Retrieval-Augmented Generation (RAG) pipeline for Motoko code search and code generation, powered by ChromaDB, local embeddings, and Google Gemini.
 
+Project Overview: https://www.loom.com/share/6dd2dfd054ff4e79a4f3bf4f61b0dc0f
+
+## RAG Pipeline
+
+<img width="1410" height="926" alt="Untitled-2025-07-18-1340" src="https://github.com/user-attachments/assets/19c42a00-8b9f-44d7-8ea1-ebde2861f4d0" />
+
+
 ## Features
 - Ingests and indexes all Motoko code samples from the `motoko_code_samples/` directory
 - Generates vector embeddings using a local SentenceTransformer model (`all-MiniLM-L6-v2`)
@@ -43,9 +50,6 @@ This will index all `.mo` and `mops.toml` files in `motoko_code_samples/` and st
 python ingest/motoko_samples_ingester.py
 ```
 
-https://www.loom.com/share/9def7522c01b4d7f8b15f2af6b8d442e?sid=910fa0d1-a1b9-4221-8eba-91831617d698
-
-
 ### 2. Start the API System
 ```bash
 # Terminal 1: Authentication server (port 8001)
@@ -69,10 +73,6 @@ python API/client_example.py
 # Or test the RAG inference directly
 python rag/inference_gemini.py
 ```
-
-https://www.loom.com/share/4448fb7d5b9941db9ef13f251149533c?sid=a1e25838-2032-4761-b9d8-23a898f05633
-
-https://www.loom.com/share/d1a86a1ea31b4619b189dc656fefcb8a?sid=ca314c26-01fe-4103-9e35-bd1295100a00
 
 ## Project Structure
 ```
