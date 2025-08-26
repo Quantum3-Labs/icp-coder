@@ -2,8 +2,7 @@
 
 A Retrieval-Augmented Generation (RAG) pipeline for Motoko code search and code generation, powered by ChromaDB, local embeddings, and Google Gemini.
 
-Project Demo  (National Round): https://app.screencastify.com/watch/fGhZUe1zzkabRKVxm1wj
-Project Overview  (Old): https://www.loom.com/share/6dd2dfd054ff4e79a4f3bf4f61b0dc0f
+**Project Demo (National Round)**: https://app.screencastify.com/watch/fGhZUe1zzkabRKVxm1wj
 
 ## RAG Pipeline
 
