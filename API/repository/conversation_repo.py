@@ -1,7 +1,7 @@
 import sqlite3
 
-from API.list_api_keys import user_id
-from API.models.conversation import Conversation
+from ..models import conversation
+from .. import list_api_keys
 
 def init_schema():
     conn = sqlite3.connect('conversations.db')
@@ -17,24 +17,24 @@ def init_schema():
     conn.commit()
     conn.close()
 
-def save_conversation(convo: Conversation):
+def save_conversation(convo: conversation.Conversation):
     conn = sqlite3.connect('conversations.db')
     cur = conn.cursor()
     if convo.id is None:
         cur.execute('''
                     INSERT INTO conversations (history, new_message, user_id) VALUES (?, ?, ?)
                     ''',
-                    (convo.serialize_history(), convo.new_message,user_id))
+                    (convo.serialize_history(), convo.new_message,list_api_keys.user_id))
         convo.id = cur.lastrowid
     else:
         cur.execute('''
                     UPDATE conversations SET history = ?, new_message = ?, user_id = ? WHERE id = ?
                     ''',
-                    (convo.serialize_history(), convo.new_message, user_id, convo.id))
+                    (convo.serialize_history(), convo.new_message, list_api_keys.user_id, convo.id))
     conn.commit()
     conn.close()
 
-def load_conversation(convo_id: int) -> Conversation:
+def load_conversation(convo_id: int) -> conversation.Conversation:
     conn = sqlite3.connect('conversations.db')
     cur = conn.cursor()
     cur.execute('''
@@ -45,6 +45,6 @@ def load_conversation(convo_id: int) -> Conversation:
 
     if row:
         convo_id, history_json, new_message, user_id = row
-        history = Conversation.deserialize_history(history_json)
-        return Conversation(history=history, new_message=new_message, convo_id=convo_id, user_id=user_id)
+        history = conversation.Conversation.deserialize_history(history_json)
+        return conversation.Conversation(history=history, new_message=new_message, convo_id=convo_id, user_id=user_id)
     return None

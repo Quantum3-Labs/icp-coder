@@ -8,12 +8,11 @@ import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 import google.generativeai as genai
 import uvicorn
-from API.models.conversation import Conversation
-from API.chains.base import Handler
-from API.chains.context_injection import ContextInjectionHandler
-from API.enum.separation import Separation
-from API.repository.conversation_repo import init_schema, load_conversation, save_conversation
-from API.database import validate_api_key
+from .models import conversation
+from .chains import context_injection
+from .enum import separation
+from .repository import conversation_repo
+from . import database
 
 # Load environment variables
 load_dotenv()
@@ -31,8 +30,8 @@ GENERATION_CONFIG = {
     "max_output_tokens": 4096,
 }
 MODEL_NAME = "models/gemini-2.5-flash"
-chain = ContextInjectionHandler()
-init_schema()
+chain = context_injection.ContextInjectionHandler()
+conversation_repo.init_schema()
 def retrieve_context(query, n_results=10):
     query_emb = embedding_fn([query])[0]
     results = collection.query(query_embeddings=[query_emb], n_results=n_results)
@@ -81,7 +80,7 @@ async def chat_completions(
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Missing API key")
     
-    valid, user_id, message = validate_api_key(x_api_key)
+    valid, user_id, message = database.validate_api_key(x_api_key)
     if not valid:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
@@ -94,18 +93,19 @@ async def chat_completions(
     # Retrieve context and answer
     docs, metadatas = retrieve_context(query)
     context = "\n---\n".join(docs)
-    convo = Conversation()
+    convo = conversation.Conversation()
     if(body.conversation_id is not None):
-        convo = load_conversation(body.conversation_id)
+        convo = conversation_repo.load_conversation(body.conversation_id)
 
     convo.set_user_id(user_id)
     convo.set_new_message(query)
     final_convo = chain.handle(convo)
     answer = answer_with_gemini_sdk(final_convo.build_conversation_history(), context)
+    print(answer)
     final_convo.add_turn("user", query)
-    final_convo.add_turn("system", answer.split(Separation.SEPRATION.value, 1)[1].strip())
+    final_convo.add_turn("system", answer.split(separation.Separation.SEPRATION.value, 1)[1].strip())
     final_convo.set_new_message(query)
-    save_conversation(final_convo)
+    conversation_repo.save_conversation(final_convo)
 
     # OpenAI-compatible response
     response = {
@@ -118,7 +118,7 @@ async def chat_completions(
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": answer
+                    "content": answer.split(separation.Separation.SEPRATION.value, 1)[0].strip()
                 },
                 "finish_reason": "stop"
             }
@@ -142,6 +142,6 @@ def root():
         "authentication": "x-api-key header required"
     }
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 

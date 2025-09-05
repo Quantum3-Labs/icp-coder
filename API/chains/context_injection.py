@@ -1,6 +1,6 @@
-from API.models.conversation import Conversation
-from API.chains.base import Handler
-from API.enum.separation import Separation
+from ..models.conversation import Conversation
+from ..chains.base import Handler
+from ..enum.separation import Separation
 class ContextInjectionHandler(Handler):
     def handle(self, convo: Conversation):
         convo.new_message = (

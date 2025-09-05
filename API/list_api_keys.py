@@ -1,9 +1,9 @@
-from database import get_user_api_keys
+from . import database
 
 # Replace with your user_id (usually 1 for the first user)
 user_id = 1
 
-api_keys = get_user_api_keys(user_id)
+api_keys = database.get_user_api_keys(user_id)
 if not api_keys:
     print("No API keys found for user_id:", user_id)
 else:
