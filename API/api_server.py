@@ -7,12 +7,16 @@ from dotenv import load_dotenv
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 import google.generativeai as genai
+import uvicorn
+from .models import conversation
+from .chains import context_injection
+from .enum import separation
+from .repository import conversation_repo
 from . import database
 
 # Load environment variables
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
 # ChromaDB setup
 CHROMA_DIR = os.path.join(os.getcwd(), "chromadb_data")
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
@@ -26,7 +30,8 @@ GENERATION_CONFIG = {
     "max_output_tokens": 4096,
 }
 MODEL_NAME = "models/gemini-2.5-flash"
-
+chain = context_injection.ContextInjectionHandler()
+conversation_repo.init_schema()
 def retrieve_context(query, n_results=10):
     query_emb = embedding_fn([query])[0]
     results = collection.query(query_embeddings=[query_emb], n_results=n_results)
@@ -61,8 +66,9 @@ class ChatCompletionRequest(BaseModel):
     frequency_penalty: Optional[float] = None
     logit_bias: Optional[Dict[str, float]] = None
     user: Optional[str] = None
-
+    conversation_id: Optional[int] = None
 app = FastAPI(title="Motoko Coder RAG API", version="1.0.0")
+
 
 @app.post("/v1/chat/completions")
 async def chat_completions(
@@ -87,7 +93,19 @@ async def chat_completions(
     # Retrieve context and answer
     docs, metadatas = retrieve_context(query)
     context = "\n---\n".join(docs)
-    answer = answer_with_gemini_sdk(query, context)
+    convo = conversation.Conversation()
+    if(body.conversation_id is not None):
+        convo = conversation_repo.load_conversation(body.conversation_id)
+
+    convo.set_user_id(user_id)
+    convo.set_new_message(query)
+    final_convo = chain.handle(convo)
+    answer = answer_with_gemini_sdk(final_convo.build_conversation_history(), context)
+    print(answer)
+    final_convo.add_turn("user", query)
+    final_convo.add_turn("system", answer.split(separation.Separation.SEPRATION.value, 1)[1].strip())
+    final_convo.set_new_message(query)
+    conversation_repo.save_conversation(final_convo)
 
     # OpenAI-compatible response
     response = {
@@ -100,7 +118,7 @@ async def chat_completions(
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": answer
+                    "content": answer.split(separation.Separation.SEPRATION.value, 1)[0].strip()
                 },
                 "finish_reason": "stop"
             }
@@ -109,8 +127,10 @@ async def chat_completions(
             "prompt_tokens": None,
             "completion_tokens": None,
             "total_tokens": None
-        }
+        },
+        "conversation_id": final_convo.id
     }
+
     return JSONResponse(content=response)
 
 @app.get("/")
@@ -120,4 +140,8 @@ def root():
         "version": "1.0.0",
         "endpoint": "/v1/chat/completions",
         "authentication": "x-api-key header required"
-    } 
+    }
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
