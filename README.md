@@ -39,7 +39,15 @@ echo GEMINI_API_KEY=your-gemini-key > .env
 
 **IMPORTANT**: All commands must be run from the project root directory to ensure correct ChromaDB access. The system uses a single ChromaDB instance located at `chromadb_data/` in the project root.
 
-### 1. Fetch Motoko Project Samples
+### 1. Fetch Motoko Data Sources
+**Important**: Run these steps in the following order to populate the ChromaDB with all necessary data.
+
+#### A. Clone Official Motoko Documentation
+```bash
+python clone_motoko_docs.py
+```
+
+#### B. Clone Motoko Project Samples
 Run the following script to automatically clone a large set of Motoko project samples into the `motoko_code_samples/` directory:
 ```bash
 python clone_motoko_repos.py
