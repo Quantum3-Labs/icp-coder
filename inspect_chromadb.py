@@ -2,7 +2,7 @@ import chromadb
 from chromadb.config import Settings
 import os
 
-CHROMA_DIR = os.path.join(os.path.dirname(__file__), "chromadb_data")
+CHROMA_DIR = os.path.join(os.getcwd(), "chromadb_data")
 
 def get_dir_size_mb(path):
     total = 0

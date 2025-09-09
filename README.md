@@ -37,20 +37,38 @@ echo GEMINI_API_KEY=your-gemini-key > .env
 
 ## Quick Start
 
-### 1. Fetch Motoko Project Samples
+**IMPORTANT**: All commands must be run from the project root directory to ensure correct ChromaDB access. The system uses a single ChromaDB instance located at `chromadb_data/` in the project root.
+
+### 1. Fetch Motoko Data Sources
+**Important**: Run these steps in the following order to populate the ChromaDB with all necessary data.
+
+#### A. Clone Official Motoko Documentation
+```bash
+python clone_motoko_docs.py
+```
+
+#### B. Clone Motoko Project Samples
 Run the following script to automatically clone a large set of Motoko project samples into the `motoko_code_samples/` directory:
 ```bash
 python clone_motoko_repos.py
 ```
 This will download many Motoko repositories and add them to `.gitignore` automatically.
 
-### 2. Ingest Motoko Code Samples
+### 2. Ingest Data into ChromaDB
+**Important**: Run these ingestion scripts in order after completing step 1. All scripts must be run from the project root directory.
+
+#### A. Ingest Motoko Documentation (if available)
+```bash
+python ingest/motoko_docs_ingester.py
+```
+
+#### B. Ingest Motoko Code Samples
 This will index all `.mo` and `mops.toml` files in `motoko_code_samples/` and store their embeddings and metadata in ChromaDB.
 ```bash
 python ingest/motoko_samples_ingester.py
 ```
 
-### 2. Start the API System
+### 3. Start the API System
 ```bash
 # Terminal 1: Authentication server (port 8001)
 set PYTHONPATH=.
@@ -65,7 +83,7 @@ set PYTHONPATH=.
 python -m uvicorn API.mcp_api_server:app --reload --port 9000
 ```
 
-### 3. Test the System
+### 4. Test the System
 ```bash
 # Run the example client
 python API/client_example.py

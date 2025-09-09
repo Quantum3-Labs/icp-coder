@@ -24,8 +24,8 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-# ChromaDB Setup - using relative path from API directory
-CHROMA_DIR = "chromadb_data"
+# ChromaDB Setup - always use project root directory
+CHROMA_DIR = os.path.join(os.getcwd(), "chromadb_data")
 chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
 embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
