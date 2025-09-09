@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from typing import Any
 import mcp.types as types
 from ...rag import inference_base as base
