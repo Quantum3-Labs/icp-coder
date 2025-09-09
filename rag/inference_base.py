@@ -140,19 +140,18 @@ Answer:"""
 
         return prompt
 
-    def prepare_request_data(self, user_id: str, prompt: str) -> Dict[str, Any]:
+    def prepare_request_data(self, prompt: str) -> Dict[str, Any]:
         """Prepare request data for API call - can be overridden by subclasses"""
         return {
             "query": prompt,
-            "user_id": user_id,
             "model": self.model_name,
             "config": self.config
         }
 
-    def process(self, user_id: str, prompt: str) -> Dict[str, Any]:
+    def process(self, prompt: str) -> Dict[str, Any]:
         """Main method that orchestrates the inference process"""
         try:
-            request_data = self.prepare_request_data(user_id, prompt)
+            request_data = self.prepare_request_data(prompt)
             
             response = self.make_api_call(request_data)
             
@@ -166,8 +165,8 @@ class InferenceContext:
     def __init__(self, strategy: BaseInferenceStrategy):
         self._strategy = strategy
     
-    def generate_response(self, user_id: str, prompt: str) -> Dict[str, Any]:
-        return self._strategy.process(user_id, prompt)
+    def generate_response(self, prompt: str) -> Dict[str, Any]:
+        return self._strategy.process(prompt)
     
     def retrieve_context(self, query: str, code_results: int = 5, docs_results: int = 8) -> Dict[str, Any]:
         """Retrieve context without calling any generation strategy"""

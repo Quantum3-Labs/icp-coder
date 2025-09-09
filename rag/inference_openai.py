@@ -66,11 +66,10 @@ class OpenAIStrategy(BaseInferenceStrategy):
                 "model": self.model_name
             }
 
-    def prepare_request_data(self, user_id: str, prompt: str) -> Dict[str, Any]:
+    def prepare_request_data(self, prompt: str) -> Dict[str, Any]:
         """Prepare request data for OpenAI API call"""
         return {
             "query": prompt,
-            "user_id": user_id,
             "model": self.model_name,
             "config": self.config
         }

@@ -3,7 +3,6 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-import anyio
 import click
 import mcp.types as types
 from mcp.server.lowlevel import Server
@@ -15,6 +14,7 @@ from starlette.types import Receive, Scope, Send
 import tool.tool_factory as tool_factory
 import tool.get_motoko_context as get_motoko_context
 import tool.generate_motoko_code as generate_motoko_code
+import uvicorn
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +44,20 @@ def main(
     )
     GET_MOTOKO_CONTEXT_TOOL = "get_motoko_context"
     GENERATE_MOTOKO_CODE_TOOL = "generate_motoko_code"
-    #init Factory
-    tool_factory.ToolFactory.register(GET_MOTOKO_CONTEXT_TOOL, get_motoko_context.GetMotokoContext)
-    tool_factory.ToolFactory.register(GENERATE_MOTOKO_CODE_TOOL, generate_motoko_code.GenerateMotokoCode)
+    # init Factory
+    tool_factory.ToolFactory.register(
+        GET_MOTOKO_CONTEXT_TOOL, get_motoko_context.GetMotokoContext
+    )
+    tool_factory.ToolFactory.register(
+        GENERATE_MOTOKO_CODE_TOOL, generate_motoko_code.GenerateMotokoCode
+    )
 
     app = Server("motoko-coder-mcp-server")
 
     @app.call_tool()
-    async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.ContentBlock]:
+    async def call_tool(
+        name: str, arguments: dict[str, Any]
+    ) -> list[types.ContentBlock]:
         ctx = app.request_context
         if name != "":
             tool = tool_factory.ToolFactory.create(name)
@@ -62,7 +68,9 @@ def main(
         return [
             types.Tool(
                 name="get_motoko_context",
-                description=("Retrieves relevant Motoko code examples based on a query."),
+                description=(
+                    "Retrieves relevant Motoko code examples based on a query."
+                ),
                 inputSchema={
                     "type": "object",
                     "required": ["query"],
@@ -76,7 +84,9 @@ def main(
             ),
             types.Tool(
                 name="generate_motoko_code",
-                description=("Generates complete Motoko code using Gemini with RAG context."),
+                description=(
+                    "Generates complete Motoko code using Gemini with RAG context."
+                ),
                 inputSchema={
                     "type": "object",
                     "required": ["query"],
@@ -87,7 +97,7 @@ def main(
                         },
                     },
                 },
-            )
+            ),
         ]
 
     session_manager = StreamableHTTPSessionManager(
@@ -97,7 +107,9 @@ def main(
         stateless=True,
     )
 
-    async def handle_streamable_http(scope: Scope, receive: Receive, send: Send) -> None:
+    async def handle_streamable_http(
+        scope: Scope, receive: Receive, send: Send
+    ) -> None:
         await session_manager.handle_request(scope, receive, send)
 
     @contextlib.asynccontextmanager
@@ -125,8 +137,8 @@ def main(
         expose_headers=["Mcp-Session-Id"],
     )
 
-    import uvicorn
-
     uvicorn.run(starlette_app, host="127.0.0.1", port=port)
 
-    return 0
+
+if __name__ == "__main__":
+    main()
