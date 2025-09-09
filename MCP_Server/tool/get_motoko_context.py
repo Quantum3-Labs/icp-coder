@@ -1,8 +1,8 @@
 from abc import abstractmethod
 from typing import Any
 import mcp.types as types
-import rag.inference_base as base
-import rag.inference_gemini as gemini
+from ...rag import inference_base as base
+from ...rag import inference_gemini as gemini
 from . import tool_factory
 class GetMotokoContext(tool_factory.ToolFactory):
     def action(self, arguments: dict[str, Any]) -> list[types.ContentBlock]:
