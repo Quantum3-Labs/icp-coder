@@ -168,3 +168,7 @@ class InferenceContext:
     
     def generate_response(self, user_id: str, prompt: str) -> Dict[str, Any]:
         return self._strategy.process(user_id, prompt)
+    
+    def retrieve_context(self, query: str, code_results: int = 5, docs_results: int = 8) -> Dict[str, Any]:
+        """Retrieve context without calling any generation strategy"""
+        return self._strategy.retrieve_context(query, code_results, docs_results)
