@@ -3,6 +3,7 @@ import mcp.types as types
 from rag import inference_base as base
 from rag import inference_gemini as gemini
 from tool import tool_factory
+
 class GetMotokoContext(tool_factory.ToolFactory):
     def action(self, arguments: dict[str, Any]) -> list[types.ContentBlock]:
         query = arguments.get("query")

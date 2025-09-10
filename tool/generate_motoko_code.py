@@ -9,7 +9,8 @@ class GenerateMotokoCode(tool_factory.ToolFactory):
         query = arguments.get("query")
         gemini_strategy = gemini.GeminiStrategy()
         context = base.InferenceContext(gemini_strategy)
-        retrieved_data = context.generate_response(1,query)
+        retrieved_data = context.generate_response(query)
+        
         return [
             types.TextContent(
                 type="text",

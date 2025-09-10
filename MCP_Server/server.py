@@ -11,6 +11,10 @@ from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import tool.tool_factory as tool_factory
 import tool.get_motoko_context as get_motoko_context
 import tool.generate_motoko_code as generate_motoko_code
