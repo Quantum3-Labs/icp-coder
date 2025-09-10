@@ -78,9 +78,9 @@ python -m uvicorn API.auth_server:app --reload --port 8001
 set PYTHONPATH=.
 python -m uvicorn API.api_server:app --reload --port 8000
 
-# Terminal 3: MCP HTTP server (port 9000)
+# Terminal 3: MCP HTTP server (port 3000)
 set PYTHONPATH=.
-python -m uvicorn API.mcp_api_server:app --reload --port 9000
+python MCP_Server/server.py --port 3000
 ```
 
 ### 4. Test the System
@@ -103,6 +103,8 @@ ICP_Coder/
 │   ├── mcp_api_server.py         # MCP HTTP server (FastAPI, port 9000)
 │   ├── client_example.py         # Example client
 │   └── README.md                 # API documentation
+├── MCP_Server/                   # MCP Server implementation
+│   └── server.py                 # MCP HTTP server (port 3000)
 ├── ingest/
 │   └── motoko_samples_ingester.py # Code samples ingestion
 ├── rag/
@@ -127,17 +129,10 @@ ICP_Coder/
 ### RAG API Server (Port 8000)
 - `POST /v1/chat/completions` - Generate Motoko code (requires API key)
 
-### MCP HTTP Server (Port 9000)
-- `POST /v1/mcp/context` - Retrieve relevant Motoko code context for RAG (requires API key)
-  - **Request body:**
-    ```json
-    {
-      "query": "How do I write a counter canister in Motoko?",
-      "api_key": "YOUR_API_KEY",
-      "max_results": 5
-    }
-    ```
-  - **Response:** JSON with context snippets, metadata, and status.
+### MCP HTTP Server (Port 3000)
+- MCP (Model Context Protocol) server providing tools for Motoko code context and generation
+- Tools available: `get_motoko_context`, `generate_motoko_code`
+- Access via MCP-compatible clients (Cursor, Claude Desktop, etc.)
 
 ## Integration with Cursor/VS Code
 
@@ -146,35 +141,26 @@ ICP_Coder/
 2. Set the "OpenAI Base URL" to: `http://localhost:8000/v1/chat/completions`
 3. Set the API key to your generated API key
 
-### As MCP HTTP Server
-Add to your MCP config (e.g., `mcp.config.json`):
-```json
-{
-  "inputs": [
-    {
-      "id": "motoko_api_key",
-      "type": "secret",
-      "description": "Your Motoko Coder API Key for RAG context"
-    }
-  ],
-  "servers": {
-    "motoko coder": {
-      "type": "http",
-      "url": "http://localhost:9000/v1/mcp/context",
-      "method": "POST",
-      "headers": {
-        "Content-Type": "application/json"
-      },
-      "body": {
-        "query": "${input.query}",
-        "api_key": "${inputs.motoko_api_key}",
-        "max_results": 5
-      }
-    }
-  }
-}
-```
-- This will prompt you for your API key and send it with every context request.
+### As MCP Server with Cursor
+1. Start the MCP server:
+   ```bash
+   python MCP_Server/server.py --port 3000
+   ```
+
+2. Configure Cursor to use the MCP server by adding this to your Cursor MCP configuration:
+   ```json
+   {
+     "mcpServers": {
+       "motoko-coder": {
+         "url": "http://localhost:3000/mcp"
+       }
+     }
+   }
+   ```
+
+3. Once configured, Cursor will have access to these MCP tools:
+   - `get_motoko_context`: Retrieves relevant Motoko code examples
+   - `generate_motoko_code`: Generates complete Motoko code with RAG context
 
 ## Usage Examples
 
@@ -196,15 +182,22 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   }'
 ```
 
-### MCP HTTP Usage
+### MCP Server Usage
+Once configured with Cursor or other MCP clients, you can:
+- Ask Motoko-related questions and get context-aware responses
+- Request code generation with relevant examples from the knowledge base
+- Get help with Motoko patterns and best practices
+
+Example MCP server commands:
 ```bash
-curl -X POST http://localhost:9000/v1/mcp/context \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "How do I write a counter canister in Motoko?",
-    "api_key": "YOUR_API_KEY",
-    "max_results": 5
-  }'
+# Start with default port 3000
+python MCP_Server/server.py
+
+# Start with custom port
+python MCP_Server/server.py --port 3001
+
+# Enable debug logging
+python MCP_Server/server.py --log-level DEBUG
 ```
 
 ## Environment Variables
