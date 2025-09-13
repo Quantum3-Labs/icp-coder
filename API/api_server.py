@@ -1,58 +1,47 @@
 import os
 from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
-import chromadb
-from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-import google.generativeai as genai
 import uvicorn
-from .models import conversation
-from .chains import context_injection
-from .enum import separation
-from .repository import conversation_repo
-from . import database
+import sys
+import os
+
+# Add project root to path first
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from API.models import conversation
+from API.chains import context_injection
+from API.enum import separation
+from API.repository import conversation_repo
+from API import database
+
+from tool.tool_factory import ToolFactory
+from tool.get_motoko_context import GetMotokoContext
+from tool.generate_motoko_code import GenerateMotokoCode
 
 # Load environment variables
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-# ChromaDB setup
-CHROMA_DIR = os.path.join(os.getcwd(), "chromadb_data")
-chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)
-collection = chroma_client.get_or_create_collection("motoko_code_samples")
-embedding_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
-GENERATION_CONFIG = {
-    "temperature": 0.7,
-    "top_p": 0.9,
-    "top_k": 64,
-    "max_output_tokens": 4096,
-}
+# Model configuration
 MODEL_NAME = "models/gemini-2.5-flash"
+
+# Tool factory setup
+ToolFactory.register("get_motoko_context", GetMotokoContext)
+ToolFactory.register("generate_motoko_code", GenerateMotokoCode)
+
 chain = context_injection.ContextInjectionHandler()
 conversation_repo.init_schema()
-def retrieve_context(query, n_results=10):
-    query_emb = embedding_fn([query])[0]
-    results = collection.query(query_embeddings=[query_emb], n_results=n_results)
-    docs = results.get("documents", [[]])[0]
-    metadatas = results.get("metadatas", [[]])[0]
-    return docs, metadatas
 
-def answer_with_gemini_sdk(query, context):
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(
-        MODEL_NAME,
-        generation_config=GENERATION_CONFIG
-    )
-    prompt = f"Context:\n{context}\n\nRequest: {query}\nAnswer:"
-    response = model.generate_content(prompt)
-    return response.text
 
 # OpenAI-compatible request/response models
 class Message(BaseModel):
     role: str
     content: str
+
 
 class ChatCompletionRequest(BaseModel):
     messages: List[Message]
@@ -67,19 +56,28 @@ class ChatCompletionRequest(BaseModel):
     logit_bias: Optional[Dict[str, float]] = None
     user: Optional[str] = None
     conversation_id: Optional[int] = None
-app = FastAPI(title="Motoko Coder RAG API", version="1.0.0")
+
+
+app = FastAPI(title="ICP-Coder", version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 
 @app.post("/v1/chat/completions")
 async def chat_completions(
-    request: Request,
-    body: ChatCompletionRequest,
-    x_api_key: str = Header(None)
+    request: Request, body: ChatCompletionRequest, x_api_key: str = Header(None)
 ):
     # API key validation using database
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Missing API key")
-    
+
     valid, user_id, message = database.validate_api_key(x_api_key)
     if not valid:
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -90,20 +88,37 @@ async def chat_completions(
         raise HTTPException(status_code=400, detail="No user message found.")
     query = user_messages[-1].content
 
-    # Retrieve context and answer
-    docs, metadatas = retrieve_context(query)
-    context = "\n---\n".join(docs)
+    # Use tool
+    code_generator = ToolFactory.create("generate_motoko_code")
+    result_blocks = code_generator.action({"query": query})
+
+    # Extract response from tool result
+    answer = (
+        result_blocks[0].text
+        if result_blocks and hasattr(result_blocks[0], "text")
+        else "Error generating response"
+    )
+
+    # Handle conversation management
     convo = conversation.Conversation()
-    if(body.conversation_id is not None):
+    if body.conversation_id is not None:
         convo = conversation_repo.load_conversation(body.conversation_id)
 
     convo.set_user_id(user_id)
     convo.set_new_message(query)
     final_convo = chain.handle(convo)
-    answer = answer_with_gemini_sdk(final_convo.build_conversation_history(), context)
+
     print(answer)
     final_convo.add_turn("user", query)
-    final_convo.add_turn("system", answer.split(separation.Separation.SEPRATION.value, 1)[1].strip())
+    # Handle response splitting if separation marker exists
+    if separation.Separation.SEPRATION.value in answer:
+        response_content = answer.split(separation.Separation.SEPRATION.value, 1)[
+            1
+        ].strip()
+    else:
+        response_content = answer
+
+    final_convo.add_turn("system", response_content)
     final_convo.set_new_message(query)
     conversation_repo.save_conversation(final_convo)
 
@@ -111,27 +126,34 @@ async def chat_completions(
     response = {
         "id": "chatcmpl-motoko-001",
         "object": "chat.completion",
-        "created": int(__import__('time').time()),
+        "created": int(__import__("time").time()),
         "model": body.model or MODEL_NAME,
         "choices": [
             {
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": answer.split(separation.Separation.SEPRATION.value, 1)[0].strip()
+                    "content": (
+                        answer.split(separation.Separation.SEPRATION.value, 1)[
+                            0
+                        ].strip()
+                        if separation.Separation.SEPRATION.value in answer
+                        else answer
+                    ),
                 },
-                "finish_reason": "stop"
+                "finish_reason": "stop",
             }
         ],
         "usage": {
             "prompt_tokens": None,
             "completion_tokens": None,
-            "total_tokens": None
+            "total_tokens": None,
         },
-        "conversation_id": final_convo.id
+        "conversation_id": final_convo.id,
     }
 
     return JSONResponse(content=response)
+
 
 @app.get("/")
 def root():
@@ -139,9 +161,9 @@ def root():
         "motoko_coder": "Motoko RAG API is running.",
         "version": "1.0.0",
         "endpoint": "/v1/chat/completions",
-        "authentication": "x-api-key header required"
+        "authentication": "x-api-key header required",
     }
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
