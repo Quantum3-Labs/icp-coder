@@ -208,6 +208,16 @@ Create a `.env` file in your project root:
 GEMINI_API_KEY=your-gemini-api-key-here
 ```
 
+## Integration with Other Tools
+
+### IC-Vibe-Coding-Template-Motoko
+
+[IC-Vibe-Coding-Template-Motoko](https://github.com/pt-icp-hub/IC-Vibe-Coding-Template-Motoko) can be enhanced by integrating with icp-coder, which provides advanced context retrieval for more accurate Motoko code generation. icp-coder's RAG pipeline can supply relevant code samples and patterns to improve the template's functionality.
+
+To integrate, once you have setup icp-coder, follow the installation instructions in the [IC-Vibe-Coding-Template-Motoko repository](https://github.com/pt-icp-hub/IC-Vibe-Coding-Template-Motoko)
+
+This integration expands the available context for code generation, resulting in more comprehensive and accurate Motoko code suggestions.
+
 ## Documentation
 
 - **System Architecture**: See `RAG_PIPELINE_DIAGRAM.md`
