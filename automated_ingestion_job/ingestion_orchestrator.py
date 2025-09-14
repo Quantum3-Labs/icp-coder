@@ -11,7 +11,7 @@ from chromadb_manager import ChromaDBManager
 
 
 class IngestionOrchestrator:
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self, config_path: str = "automated_ingestion_job/config.json"):
         """Initialize Ingestion Orchestrator with configuration."""
         self.config = self._load_config(config_path)
 

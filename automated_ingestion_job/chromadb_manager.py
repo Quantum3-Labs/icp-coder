@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 class ChromaDBManager:
-    def __init__(self, config_path: str = "job/config.json"):
+    def __init__(self, config_path: str = "automated_ingestion_job/config.json"):
         """Initialize ChromaDB Manager with configuration."""
         self.config = self._load_config(config_path)
 
@@ -27,7 +27,7 @@ class ChromaDBManager:
             # Handle relative path from job directory
             if not os.path.isabs(config_path):
                 # If running from job directory, use current directory
-                if os.path.basename(os.getcwd()) == "job":
+                if os.path.basename(os.getcwd()) == "automated_ingestion_job":
                     config_path = "config.json"
                 # Otherwise assume running from project root
 
