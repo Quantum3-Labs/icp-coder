@@ -3,14 +3,21 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
-from . import database
+try:
+    from . import database
+except ImportError:
+    import database
 from datetime import datetime
 from datetime import datetime, timedelta
 import jwt
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordBearer
+from dotenv import load_dotenv
+import os
 
-SECRET_KEY = "8cddb477dc4a24dcffdb78afd5dea597"
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -91,6 +98,10 @@ async def login_user(user_data: UserLogin):
 
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": str(user_id), "exp": expire}
+    if not SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
