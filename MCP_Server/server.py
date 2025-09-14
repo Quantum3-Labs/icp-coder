@@ -15,12 +15,30 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+import API.database as database
+from starlette.responses import JSONResponse
 import tool.tool_factory as tool_factory
 import tool.get_motoko_context as get_motoko_context
 import tool.generate_motoko_code as generate_motoko_code
 import uvicorn
 
 logger = logging.getLogger(__name__)
+
+class CustomHeaderMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        key = request.headers.get("API_KEY")
+        if not key:
+            return JSONResponse({"error": "Missing API key"}, status_code=401)
+
+        valid, user_id, message = database.validate_api_key(key)
+
+        if not valid:
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+        return await call_next(request)
 
 
 @click.command()
@@ -126,12 +144,16 @@ def main(
             finally:
                 logger.info("Application shutting down...")
 
+    middlewares = [
+        Middleware(CustomHeaderMiddleware),
+    ]
     starlette_app = Starlette(
         debug=True,
         routes=[
             Mount("/mcp", app=handle_streamable_http),
         ],
         lifespan=lifespan,
+        middleware=middlewares,
     )
 
     starlette_app = CORSMiddleware(

@@ -3,9 +3,26 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
-from . import database
+try:
+    from . import database
+except ImportError:
+    import database
 from datetime import datetime
+from datetime import datetime, timedelta
+import jwt
+from fastapi import HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 app = FastAPI(title="Motoko Coder Auth API", version="1.0.0")
 security = HTTPBasic()
 
@@ -60,19 +77,42 @@ async def register_user(user_data: UserRegistration):
     else:
         raise HTTPException(status_code=400, detail=message)
 
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> int:
+
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    user_id: str | None = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token payload missing 'sub'",
+        )
+    return int(user_id)
+
+
 @app.post("/login", response_model=dict)
 async def login_user(user_data: UserLogin):
     """Login user and return user info."""
     success, user_id, message = database.authenticate_user(
         user_data.username, user_data.password
     )
-    
+
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": str(user_id), "exp": expire}
+    if not SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
     if success:
         return {
             "success": True,
             "message": message,
             "user_id": user_id,
-            "username": user_data.username
+            "username": user_data.username,
+            "access_token": token,
+            "token_type": "bearer",
         }
     else:
         raise HTTPException(status_code=401, detail=message)
