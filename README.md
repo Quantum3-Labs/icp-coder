@@ -218,6 +218,14 @@ To integrate, once you have setup icp-coder, follow the installation instruction
 
 This integration expands the available context for code generation, resulting in more comprehensive and accurate Motoko code suggestions.
 
+## Automated Data Ingestion (Background Cron Job)
+
+The `automated_ingestion_job` directory contains a scheduler that automatically refreshes the ChromaDB database monthly on the 1st day at 2 AM UTC. It clones fresh Motoko repositories and rebuilds the vector database to keep code samples up-to-date.
+
+```bash
+python automated_ingestion_job/scheduler.py
+```
+
 ## Documentation
 
 - **System Architecture**: See `RAG_PIPELINE_DIAGRAM.md`

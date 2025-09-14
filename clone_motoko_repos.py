@@ -160,6 +160,7 @@ with open(GITIGNORE_FILE, "a") as ignore_file:
         try:
             subprocess.run(["git", "clone", url, repo_path], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
-            tqdm.write(f"❌ Failed to clone {url}")
+            tqdm.write(f"X Failed to clone {url}")
+            continue  # Skip to next repository
 
-print("\n✅ Done cloning all repositories.")
+print("\nDone cloning all repositories.")
