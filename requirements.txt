@@ -12,3 +12,4 @@ flask==3.1.1
 mcp[cli]
 pyjwt
 mcp[cli]
+apscheduler==3.11.0
