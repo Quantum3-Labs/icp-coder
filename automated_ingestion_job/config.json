@@ -1,0 +1,16 @@
+{
+  "directories": {
+    "chromadb_data": "chromadb_data",
+    "motoko_samples": "motoko_code_samples",
+    "motoko_docs": "motoko_official_docs"
+  },
+  "cron": {
+    "schedule": "0 2 1 * *",
+    "comment": "ChromaDB Re-initialization",
+    "user": null
+  },
+  "git": {
+    "clone_timeout": 300,
+    "retry_attempts": 3
+  }
+}
