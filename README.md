@@ -119,6 +119,7 @@ The MCP server uses the authentication service to guard access. Create an API ke
    ```
    The response includes an api_key value--use it in your MCP client configuration.
 
+
 ## Run the MCP Server
 
 With the knowledge base prepared, launch the MCP server to make the retrieval tools available:
@@ -154,6 +155,13 @@ If the port is already in use, stop the conflicting service or supply an alterna
 4. Restart the client if required. Available tools:
    - `get_motoko_context`: retrieves relevant Motoko examples
    - `generate_motoko_code`: generates Motoko code with RAG context
+
+## How It Works
+
+1. **User Query**: You ask for help with Motoko code, mentioning the MCP tool you want to use.
+2. **Context Retrieval**: The server searches ChromaDB for relevant examples.
+3. **Gemini Generation**: Gemini combines the retrieved context with your prompt to draft better code.
+4. **Response**: The MCP server returns context snippets and/or generated code back to Cursor.
 
 ## Optional Interfaces
 
