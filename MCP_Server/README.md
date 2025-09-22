@@ -47,7 +47,7 @@ curl -X POST 'http://localhost:8001/register' \
 -H "Content-Type: application/json" \
 -d '{"username": "your_username", "password": "your_password", "email":"your_email@gmail.com}'
 ```
-6. **Register a new account**
+6. **Login with new account**
 - Request:
 ```bash
 curl -X POST 'http://localhost:8001/login' \
