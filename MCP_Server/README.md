@@ -7,19 +7,20 @@ A clean, simple MCP (Model Context Protocol) server that provides RAG-powered co
 - **RAG Context Retrieval**: Uses sentence transformers to find relevant Motoko code examples
 - **Gemini Code Generation**: Generates high-quality Motoko code using retrieved context
 - **MCP Protocol**: Follows the Model Context Protocol for seamless Cursor integration
-- **Simple Setup**: No complex API servers or authentication - just pure MCP functionality
 
 ## Prerequisites
 
 1. **Python Environment**: Python 3.8+ with virtual environment
 2. **ChromaDB Data**: Must have ingested Motoko code samples
-3. **Gemini API Key**: For code generation (optional but recommended)
-
+3. **Gemini API Key**: Required for code generation used in `generate_motoko_code`
+4. **API Key from ICP_Coder**: Required for authentication to use the MCP server
 ## Installation
 
 1. **Install Dependencies**:
    ```bash
-   pip install chromadb sentence-transformers google-generativeai python-dotenv
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
    ```
 
 2. **Set Environment Variables**:
@@ -34,39 +35,71 @@ A clean, simple MCP (Model Context Protocol) server that provides RAG-powered co
    python ingest/motoko_samples_ingester.py
    ```
 
+4. **Start Authentication server**
+   ``` bash
+   # Terminal 1: Authentication server (port 8001)
+   set PYTHONPATH=.
+   python -m uvicorn API.auth_server:app --reload --port 8001
+   ```
+5. **Register a new account**
+```bash
+curl -X POST 'http://localhost:8001/register' \
+-H "Content-Type: application/json" \
+-d '{"username": "your_username", "password": "your_password", "email":"your_email@gmail.com}'
+```
+6. **Register a new account**
+- Request:
+```bash
+curl -X POST 'http://localhost:8001/login' \
+-H "Content-Type: application/json" \
+-d '{"username": "your_username", "password": "your_password"'
+```
+- Response:
+```json
+{
+   "success": true,
+   "message": "Authentication successful",
+   "user_id": 4,
+   "username": "your_username",
+   "access_token": "YOUR_ACCESS_TOKEN",
+   "token_type": "bearer"
+}
+```
+7. **Get API key**
+- Request:
+```bash
+curl -X POST 'http://localhost:8001/api-keys' \
+-H "Content-Type: application/json" \
+-H 'Authorization: Bearer YOUR_ACCESS_TOKEN' \ 
+-d '{"name": "your_api_key_name"'} #Copy your access token from step 6
+```
+- Response:
+```json
+{
+   "success": true,
+   "message": "API key created successfully",
+   "api_key": "YOUR_API_KEY",
+   "name": "your_api_key_name"
+}
+```
 ## Cursor IDE Setup
 
-### Option 1: Direct Configuration
+### Configuration File
 
-1. Open Cursor IDE
-2. Go to **Settings** (Cmd/Ctrl + ,)
-3. Search for "MCP" or "Model Context Protocol"
-4. Add this configuration:
+1. Go to cursor setting, in the `MCP & Integrations` section. Add `New MCP Server`
+2. Copy `mcp_server_config_example.json` to `mcp.json` in Cursor to set up the new MCP server.
+3. Replace `YOUR_API_KEY` with the API key generated in the installation step above.
 
 ```json
 {
   "mcpServers": {
     "motoko-coder": {
-      "command": "python",
-      "args": ["/path/to/your/ICP_Coder/API/mcp_server.py"],
-      "env": {
-        "PYTHONPATH": "/path/to/your/ICP_Coder"
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "API_KEY": "YOUR_API_KEY"
       }
     }
   }
-}
-```
-
-**Replace `/path/to/your/ICP_Coder` with your actual project path.**
-
-### Option 2: Configuration File
-
-1. Copy the `mcp_config.json` file to your Cursor configuration directory
-2. In Cursor settings, specify the path to your MCP config file:
-
-```json
-{
-  "mcp.configPath": "/path/to/your/ICP_Coder/API/mcp_config.json"
 }
 ```
 
@@ -76,30 +109,13 @@ A clean, simple MCP (Model Context Protocol) server that provides RAG-powered co
 
 Retrieves relevant Motoko code examples based on a query.
 
-**Input**:
-- `query` (string): What you're looking for
-- `max_results` (integer, optional): Number of results (default: 5)
-
 **Use Case**: When you need to see examples of similar Motoko code patterns.
 
 ### 2. `generate_motoko_code`
 
 Generates complete Motoko code using Gemini with RAG context.
 
-**Input**:
-- `query` (string): Your code generation request
-- `max_context_results` (integer, optional): Context examples to use (default: 5)
-
 **Use Case**: When you want to generate new Motoko code with context-aware assistance.
-
-## Testing
-
-Run the test script to verify everything works:
-
-```bash
-cd API
-python test_mcp.py
-```
 
 ## Usage in Cursor
 
@@ -112,7 +128,7 @@ python test_mcp.py
 
 ## How It Works
 
-1. **User Query**: You ask for help with Motoko code
+1. **User Query**: You ask for help with Motoko code, mentioning the MCP tool you want to use.
 2. **Context Retrieval**: Server searches ChromaDB for relevant examples
 3. **Gemini Generation**: Uses retrieved context to generate better code
 4. **Response**: Returns context and/or generated code to Cursor
@@ -134,15 +150,16 @@ echo "GEMINI_API_KEY=your_key_here" > .env
 ### Issue: MCP server not starting
 **Solution**: Check Python path and dependencies:
 ```bash
-cd API
-python -c "import chromadb, google.generativeai; print('Dependencies OK')"
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 ### Issue: Cursor not recognizing tools
 **Solution**: 
 1. Restart Cursor IDE
-2. Check the MCP configuration syntax
-3. Verify the Python path is correct
+2. Check the MCP server
+3. Verify that your api key is correct
 
 ## Architecture
 
@@ -157,7 +174,7 @@ User Query → MCP Server → RAG Context Retrieval → Gemini Code Generation �
 ## Development
 
 The server is built with simplicity in mind:
-- **Single file**: `mcp_server.py` contains everything
+- **Single file**: `server.py` contains everything
 - **No external dependencies**: Just ChromaDB and Gemini
 - **MCP compliant**: Follows the Model Context Protocol specification
 - **Error handling**: Graceful fallbacks and clear error messages
@@ -167,7 +184,7 @@ The server is built with simplicity in mind:
 1. **Test the setup** with the provided test script
 2. **Configure Cursor** using one of the setup options
 3. **Start coding** with enhanced Motoko assistance
-4. **Customize prompts** in the `generate_code_with_gemini` method if needed
+4. **Customize prompts** in the `generate_code_with_gemini` tool if needed
 
 ---
 
