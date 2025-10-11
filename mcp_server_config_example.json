@@ -1,9 +1,13 @@
 {
   "mcpServers": {
-    "motoko-coder": {
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "API_KEY": "YOUR_API_KEY"
+    "icp-coder": {
+      "command": "node",
+      "args": [
+        "E:\\partime\\icp-coder\\node_mcp_server\\dist\\index.js"
+      ],
+      "env": {
+        "API_KEY": "YOUR_API_KEY_HERE",
+        "BACKEND_URL": "http://localhost:8080"
       }
     }
   }

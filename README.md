@@ -26,135 +26,83 @@ Motoko Coder is built around an MCP (Model Context Protocol) server that streams
 - ChromaDB-backed storage for metadata and vector search
 
 ## Prerequisites
-- Python 3.11+
-- [ChromaDB](https://www.trychroma.com/)
-- [sentence-transformers](https://www.sbert.net/)
-- [tqdm](https://tqdm.github.io/) (for progress bars)
-- [python-dotenv](https://pypi.org/project/python-dotenv/) (for loading environment variables)
-- Google Gemini API key
+
+### Required Software
+- **Go 1.24+** - Backend API server (if run directly)
+- **Python 3.11+** - RAG pipeline and embedding generation (if run directly)
+- **Node.js 22+** - MCP server (node_mcp_server)
+- **Docker & Docker Compose** - Containerized deployment
+- **Make** - Build automation (pre-installed on Linux/Mac, [install on Windows](https://gnuwin32.sourceforge.net/packages/make.htm))
+
+### Python Dependencies
+- [ChromaDB](https://www.trychroma.com/) - Vector database for embeddings
+- [sentence-transformers](https://www.sbert.net/) - Local embedding models
+- [tqdm](https://tqdm.github.io/) - Progress bars during ingestion
+- [python-dotenv](https://pypi.org/project/python-dotenv/) - Environment variable management
+
+### API Keys
+- **Google Gemini API key** (required for code generation)
+- Optional: OpenAI API key or Claude API key (alternative providers)
+
+### System Requirements
+- **~10GB of free storage** (local deployment with full dataset)
 
 ## Setup
 
-Run all commands from the project root so the shared ChromaDB instance at `chromadb_data/` is detected correctly.
+### 1. RAG Backend Setup
+
+Navigate to the backend directory, create an environment file, and start the Go API server:
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+cd backend
+cp .env.example .env
+# Edit .env file and add your configuration (API keys, database settings, etc.)
+make up
+cd ..
 ```
 
-Create a `.env` file in the project root with your Gemini credentials:
+**Important**: Make sure to update the values in `.env` with your actual credentials before running `make up`.
 
-```env
-GEMINI_API_KEY=your-gemini-api-key-here
-SECRET_KEY=change-me
-```
+### 2. Node MCP Server Setup
 
-## Prepare the Knowledge Base
-
-Populate the vector store before starting the MCP server.
-
-1. **Clone official Motoko documentation**
-   ```bash
-   python clone_motoko_docs.py
-   ```
-
-2. **Clone Motoko project samples**
-   ```bash
-   python clone_motoko_repos.py
-   ```
-   This script downloads a curated collection into `motoko_code_samples/` and updates `.gitignore` automatically.
-
-3. **Ingest Motoko documentation**
-   ```bash
-   python ingest/motoko_docs_ingester.py
-   ```
-
-4. **Ingest Motoko code samples**
-   ```bash
-   python ingest/motoko_samples_ingester.py
-   ```
-   All `.mo` and `mops.toml` files are embedded and stored in ChromaDB.
-
-## Generate an API Key
-
-The MCP server uses the authentication service to guard access. Create an API key before connecting external clients.
-
-1. Start the authentication API (runs alongside the MCP server):
-   ```bash
-   set PYTHONPATH=.
-   python -m uvicorn API.auth_server:app --reload --port 8001
-   ```
-
-2. Register a user (once per install):
-   ```bash
-   curl -X POST http://localhost:8001/register \
-     -H "Content-Type: application/json" \
-     -d '{
-       "username": "motoko",
-       "password": "s3cret",
-       "email": "you@example.com"
-     }'
-   ```
-
-3. Log in to receive a bearer token:
-   ```bash
-   curl -X POST http://localhost:8001/login \
-     -H "Content-Type: application/json" \
-     -d '{
-       "username": "motoko",
-       "password": "s3cret"
-     }'
-   ```
-   Copy the `access_token` from the response.
-
-4. Create an API key (supply the bearer token from the previous step):
-   ```bash
-   curl -X POST http://localhost:8001/api-keys \
-     -H "Authorization: Bearer ACCESS_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "name": "Cursor"
-     }'
-   ```
-   The response includes an api_key value--use it in your MCP client configuration.
-
-
-## Run the MCP Server
-
-With the knowledge base prepared, launch the MCP server to make the retrieval tools available:
+Navigate to the node_mcp_server directory and build the TypeScript server:
 
 ```bash
-set PYTHONPATH=.
-python MCP_Server/server.py --port 3000
+cd node_mcp_server
+npm install
+npm run build
+cd ..
 ```
 
-Key options:
-- `--port`: choose a different HTTP port (default `3000`)
-- `--log-level`: adjust logging (`DEBUG`, `INFO`, etc.)
+### 3. Generate API Key
 
-If the port is already in use, stop the conflicting service or supply an alternative port.
+Once the backend is running, navigate to the Swagger UI to register an account and generate an API key:
 
-## Connect from Cursor/VS Code
+1. Open your browser and go to: **http://localhost:8080/swagger/index.html**
+2. Register a new account
+3. Login with your credentials
+4. Generate an API key (save this for the next step)
 
-1. Start the MCP server (see above).
-2. In Cursor/VS Code, open the LLM or MCP configuration.
-3. Add the Motoko Coder MCP endpoint (replace `YOUR_API_KEY` with one generated below):
-   ```json
-   {
-     "mcpServers": {
-       "motoko-coder": {
-         "url": "http://localhost:3000/mcp",
-         "headers": {
-           "API_KEY": "YOUR_API_KEY"
-         }
-       }
-     }
-   }
-   ```
-4. Restart the client if required. Available tools:
-   - `get_motoko_context`: retrieves relevant Motoko examples
-   - `generate_motoko_code`: generates Motoko code with RAG context
+### 4. Configure MCP Server in Cursor
+
+Add the following configuration to your Cursor MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "icp-coder": {
+      "command": "node",
+      "args": [
+        "ABSOLUTE_PATH_TO_dist/index.js"
+      ],
+      "env": {
+        "API_KEY": "YOUR_API_FROM_STEP_3",
+        "BACKEND_URL": "http://localhost:8080"
+      }
+    }
+  }
+}
+```
 
 ## How It Works
 
@@ -179,18 +127,10 @@ set PYTHONPATH=.
 python -m uvicorn API.api_server:app --reload --port 8000
 ```
 
-### Test the API
-
-Example client:
+### Test Chat Completion API
 
 ```bash
-python API/client_example.py
-```
-
-Direct cURL request:
-
-```bash
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_API_KEY" \
   -d '{
@@ -200,20 +140,29 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   }'
 ```
 
+With optional parameters:
+
+```bash
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -d '{
+    "model": "gemini-2.0-flash-exp",
+    "messages": [
+      {"role": "user", "content": "How do I write a counter canister in Motoko?"}
+    ],
+    "temperature": 0.7,
+    "max_tokens": 2000,
+    "conversation_id": 123
+  }'
+```
+
 ### Direct CLI Inference
 
 Run the standalone script to experiment with Gemini-powered RAG outside of MCP clients:
 
 ```bash
 python rag/inference_gemini.py
-```
-
-## Data Refresh Automation
-
-The `automated_ingestion_job` scheduler refreshes the ChromaDB database on the 1st of every month at 02:00 UTC. It reclones repositories and rebuilds embeddings to keep suggestions current.
-
-```bash
-python automated_ingestion_job/scheduler.py
 ```
 
 ## Integrations
@@ -256,7 +205,3 @@ ICP_Coder/
 - **RAG Approach**: `RAG_APPROACH_DIAGRAM.md`
 - **API Documentation**: `API/README.md`
 - **MCP Specification**: `API/MCP_SPECIFICATION.md`
-
----
-
-Build Motoko code assistants with Python, ChromaDB, Gemini, and a first-class MCP workflow.
