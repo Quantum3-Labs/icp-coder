@@ -1,5 +1,12 @@
 # Environment variables
 .env
+.env.dev
+.env.dev.example
+!.env.example
+
+# Docker development files
+Dockerfile.dev
+docker-compose.dev.yml
 
 # Python
 __pycache__/
@@ -54,6 +61,9 @@ Thumbs.db
 # ChromaDB data (optional - remove if you want to track the database)
 chromadb_data/
 
+# Backend data directory
+backend/data/
+
 # Logs
 *.log
 logs/
@@ -70,3 +80,6 @@ tmp/
 secrets/motoko_code_samples/candid-spaces
 motoko_code_samples/
 motoko_official_docs/
+
+# Node dependencies
+node_mcp_server/node_modules/
