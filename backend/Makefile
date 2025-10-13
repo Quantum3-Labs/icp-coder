@@ -60,87 +60,87 @@ clean-data:
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker image..."
-	docker-compose build
+	docker compose build
 
 .PHONY: up
 up:
 	@echo "Starting Docker containers..."
-	docker-compose up -d
+	docker compose up -d
 	@echo "Backend is running at http://localhost:8080"
 
 .PHONY: docker-down
 docker-down:
 	@echo "Stopping Docker containers..."
-	docker-compose down
+	docker compose down
 
 .PHONY: docker-logs
 docker-logs:
 	@echo "Viewing Docker logs (Ctrl+C to exit)..."
-	docker-compose logs -f
+	docker compose logs -f
 
 .PHONY: docker-restart
 docker-restart:
 	@echo "Restarting Docker containers..."
-	docker-compose restart
+	docker compose restart
 
 .PHONY: docker-rebuild
 docker-rebuild:
 	@echo "Rebuilding and restarting Docker containers..."
-	docker-compose up -d --build
+	docker compose up -d --build
 
 .PHONY: docker-clean
 docker-clean:
 	@echo "Stopping and removing Docker containers and volumes..."
-	docker-compose down -v
+	docker compose down -v
 	@echo "Docker cleanup complete."
 
 .PHONY: docker-ps
 docker-ps:
 	@echo "Docker container status:"
-	docker-compose ps
+	docker compose ps
 
 .PHONY: docker-shell
 docker-shell:
 	@echo "Opening shell in backend container..."
-	docker-compose exec icp-coder /bin/sh
+	docker compose exec icp-coder /bin/sh
 
 # Development environment with live reload
 .PHONY: dev-up
 dev-up:
 	@echo "Starting development environment with live reload..."
-	docker-compose -f docker-compose.dev.yml up -d
+	docker compose -f docker compose.dev.yml up -d
 	@echo "Development backend is running at http://localhost:8080"
 	@echo "Code changes will trigger automatic rebuild"
 
 .PHONY: dev-down
 dev-down:
 	@echo "Stopping development containers..."
-	docker-compose -f docker-compose.dev.yml down
+	docker compose -f docker compose.dev.yml down
 
 .PHONY: dev-logs
 dev-logs:
 	@echo "Viewing development logs (Ctrl+C to exit)..."
-	docker-compose -f docker-compose.dev.yml logs -f
+	docker compose -f docker compose.dev.yml logs -f
 
 .PHONY: dev-rebuild
 dev-rebuild:
 	@echo "Rebuilding development environment..."
-	docker-compose -f docker-compose.dev.yml up -d --build
+	docker compose -f docker compose.dev.yml up -d --build
 
 .PHONY: dev-restart
 dev-restart:
 	@echo "Restarting development containers..."
-	docker-compose -f docker-compose.dev.yml restart
+	docker compose -f docker compose.dev.yml restart
 
 .PHONY: dev-shell
 dev-shell:
 	@echo "Opening shell in development container..."
-	docker-compose -f docker-compose.dev.yml exec backend /bin/bash
+	docker compose -f docker compose.dev.yml exec backend /bin/bash
 
 .PHONY: dev-clean
 dev-clean:
 	@echo "Stopping and removing development containers and volumes..."
-	docker-compose -f docker-compose.dev.yml down -v
+	docker compose -f docker compose.dev.yml down -v
 	@echo "Development cleanup complete."
 
 .PHONY: help
