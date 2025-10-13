@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -111,7 +112,28 @@ func RetrieveContext(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(http.StatusOK, response)
+		var formatted strings.Builder
+		
+		if len(response.CodeContexts) > 0 {
+			formatted.WriteString("## Code Contexts:\n\n")
+			for i, context := range response.CodeContexts {
+				formatted.WriteString(fmt.Sprintf("### Code Context %d:\n```motoko\n%s\n```\n\n", i+1, context))
+			}
+		}
+
+		if len(response.DocsContexts) > 0 {
+			formatted.WriteString("## Documentation Contexts:\n\n")
+			for i, doc := range response.DocsContexts {
+				formatted.WriteString(fmt.Sprintf("### Documentation Context %d:\n```text\n%s\n```\n\n", i+1, doc))
+			}
+		}
+
+		formattedContext := formatted.String()
+		response.FormattedContext = formattedContext
+
+		c.JSON(http.StatusOK, gin.H{
+			"formatted_context": formattedContext,
+		})
 	}
 }
 
@@ -161,6 +183,7 @@ func GenerateCode(db *sql.DB) gin.HandlerFunc {
 			c.Request.Context(),
 			req.Query,
 			ragResponse.CodeContexts,
+			ragResponse.DocsContexts,
 			req.Temperature,
 			req.MaxTokens,
 		)

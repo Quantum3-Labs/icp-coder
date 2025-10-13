@@ -82,4 +82,4 @@ motoko_code_samples/
 motoko_official_docs/
 
 # Node dependencies
-node_mcp_server/node_modules/
+mcp_server/node_modules/

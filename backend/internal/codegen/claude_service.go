@@ -100,7 +100,7 @@ func NewClaudeServiceFromEnv() (*ClaudeService, error) {
 }
 
 // GenerateCode calls Anthropic Claude API to generate code with provided contexts.
-func (s *ClaudeService) GenerateCode(ctx context.Context, query string, contexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error) {
+func (s *ClaudeService) GenerateCode(ctx context.Context, query string, codeContexts []string, docContexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error) {
 	if temperature == 0 {
 		temperature = defaultClaudeTemperature
 	}
@@ -108,7 +108,7 @@ func (s *ClaudeService) GenerateCode(ctx context.Context, query string, contexts
 		maxTokens = defaultClaudeMaxTokens
 	}
 
-	prompt := assembleContextPrompt(query, contexts)
+	prompt := buildCodeGenerationInstruction(query, codeContexts, docContexts)
 
 	reqPayload := claudeRequest{
 		Model:       s.model,

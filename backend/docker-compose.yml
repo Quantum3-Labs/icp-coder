@@ -13,14 +13,13 @@ services:
     env_file:
       - .env
     volumes:
-      # Persistent data volume (contains chromadb, motoko_code_samples, motoko_official_docs)
       - data-volume:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 30s
+      interval: 60s
       timeout: 10s
-      start_period: 40s
+      start_period: 10m
       retries: 3
     networks:
       - icp-coder-network

@@ -38,7 +38,6 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8080
 
-# Create volumes for persistent data
 VOLUME ["/app/data"]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

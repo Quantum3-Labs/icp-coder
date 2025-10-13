@@ -24,12 +24,13 @@ type RAGRequest struct {
 
 // RAGResponse represents the output from the Python script
 type RAGResponse struct {
-	CodeContexts  []string  `json:"code_contexts"`
-	CodeDistances []float64 `json:"code_distances"`
-	DocsContexts  []string  `json:"docs_contexts"`
-	DocsDistances []float64 `json:"docs_distances"`
-	Warning       string    `json:"warning,omitempty"`
-	Error         string    `json:"error,omitempty"`
+	CodeContexts     []string  `json:"code_contexts"`
+	CodeDistances    []float64 `json:"code_distances"`
+	DocsContexts     []string  `json:"docs_contexts"`
+	DocsDistances    []float64 `json:"docs_distances"`
+	FormattedContext string    `json:"formatted_context,omitempty"`
+	Warning          string    `json:"warning,omitempty"`
+	Error            string    `json:"error,omitempty"`
 }
 
 // NewPythonClient creates a new Python client for RAG operations

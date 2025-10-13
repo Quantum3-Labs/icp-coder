@@ -89,7 +89,7 @@ func NewOpenAIServiceFromEnv() (*OpenAIService, error) {
 }
 
 // GenerateCode calls the OpenAI API to generate code using provided contexts.
-func (s *OpenAIService) GenerateCode(ctx context.Context, query string, contexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error) {
+func (s *OpenAIService) GenerateCode(ctx context.Context, query string, codeContexts []string, docContexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error) {
 	if temperature == 0 {
 		temperature = 0.7
 	}
@@ -97,7 +97,7 @@ func (s *OpenAIService) GenerateCode(ctx context.Context, query string, contexts
 		maxTokens = 512
 	}
 
-	prompt := assembleContextPrompt(query, contexts)
+	prompt := buildCodeGenerationInstruction(query, codeContexts, docContexts)
 
 	reqPayload := openAIRequest{
 		Model: s.model,

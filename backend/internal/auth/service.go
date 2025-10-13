@@ -8,6 +8,8 @@ import (
 	"errors"
 	"math/big"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -16,11 +18,13 @@ const (
 	apiKeyPrefix  = "mk_"
 )
 
-// HashPassword hashes a password using SHA-256.
-// TODO: replace with bcrypt for stronger password security.
-func HashPassword(password string) string {
-	hash := sha256.Sum256([]byte(password))
-	return hex.EncodeToString(hash[:])
+// HashPassword hashes a password using bcrypt.
+func HashPassword(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashed), nil
 }
 
 // GenerateAPIKey returns a random API key with the configured prefix.
@@ -76,8 +80,10 @@ func CreateUser(db *sql.DB, username, password string, email *string, role strin
 		return 0, errors.New("username already exists")
 	}
 
-	passwordHash := HashPassword(password)
-
+	passwordHash, err := HashPassword(password)
+	if err != nil {
+		return 0, err
+	}
 	result, err := db.Exec(`
 		INSERT INTO users (username, password_hash, email, role)
 		VALUES (?, ?, ?, ?)
@@ -96,14 +102,12 @@ func CreateUser(db *sql.DB, username, password string, email *string, role strin
 
 // AuthenticateUser validates the provided credentials and returns the user.
 func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
-	passwordHash := HashPassword(password)
-
 	var user User
 	err := db.QueryRow(`
 		SELECT id, username, password_hash, email, created_at, is_active, role
 		FROM users
-		WHERE username = ? AND password_hash = ? AND is_active = 1
-	`, username, passwordHash).Scan(
+		WHERE username = ? AND is_active = 1
+	`, username).Scan(
 		&user.ID,
 		&user.Username,
 		&user.PasswordHash,
@@ -120,6 +124,11 @@ func AuthenticateUser(db *sql.DB, username, password string) (*User, error) {
 		return nil, err
 	}
 
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return nil, errors.New("invalid username or password")
+	}
+
+	user.PasswordHash = ""
 	return &user, nil
 }
 

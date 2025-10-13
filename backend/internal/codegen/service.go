@@ -14,7 +14,7 @@ const (
 
 // Service describes a generic code generation provider.
 type Service interface {
-	GenerateCode(ctx context.Context, query string, contexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error)
+	GenerateCode(ctx context.Context, query string, codeContexts []string, docContexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error)
 }
 
 // ProviderFromEnv determines which provider is configured via environment variables.

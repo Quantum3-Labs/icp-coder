@@ -52,9 +52,9 @@ func NewGeminiServiceFromEnv() (*GeminiService, error) {
 }
 
 // GenerateCode generates Motoko code using Gemini with provided context
-func (s *GeminiService) GenerateCode(ctx context.Context, query string, contexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error) {
+func (s *GeminiService) GenerateCode(ctx context.Context, query string, codeContexts []string, docContexts []string, temperature float64, maxTokens int) (*CodeGenerationResponse, error) {
 	// Assemble prompt with context
-	prompt := assembleContextPrompt(query, contexts)
+	prompt := buildCodeGenerationInstruction(query, codeContexts, docContexts)
 
 	// Set defaults
 	if temperature == 0 {

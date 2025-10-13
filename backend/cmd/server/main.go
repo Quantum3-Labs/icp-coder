@@ -14,10 +14,6 @@ import (
 // @title           ICP Coder Authentication API
 // @version         1.0
 // @description     Authentication and API Key Management for ICP Coder
-// @termsOfService  http://swagger.io/terms/
-
-// @contact.name   API Support
-// @contact.email  support@icpcoder.com
 
 // @license.name  MIT
 // @license.url   https://opensource.org/licenses/MIT

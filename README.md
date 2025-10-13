@@ -30,7 +30,7 @@ Motoko Coder is built around an MCP (Model Context Protocol) server that streams
 ### Required Software
 - **Go 1.24+** - Backend API server (if run directly)
 - **Python 3.11+** - RAG pipeline and embedding generation (if run directly)
-- **Node.js 22+** - MCP server (node_mcp_server)
+- **Node.js 22+** - MCP server (mcp_server)
 - **Docker & Docker Compose** - Containerized deployment
 - **Make** - Build automation (pre-installed on Linux/Mac, [install on Windows](https://gnuwin32.sourceforge.net/packages/make.htm))
 
@@ -56,22 +56,23 @@ Navigate to the backend directory, create an environment file, and start the Go 
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env file and add your configuration (API keys, database settings, etc.)
+# Edit .env file and add your configuration (LLM API key (currently supporting Gemini, Claude, OpenAI), database settings, etc.)
 make up
 cd ..
 ```
 
-**Important**: Make sure to update the values in `.env` with your actual credentials before running `make up`.
+**Important**: 
+  - Only set one LLM provider and its key at a time.
+  - Make sure to update the values in `.env` with your actual credentials before running `make docker-build`.
 
 ### 2. Node MCP Server Setup
 
-Navigate to the node_mcp_server directory and build the TypeScript server:
+Navigate to the mcp_server directory and build the TypeScript server:
 
 ```bash
-cd node_mcp_server
+cd mcp_server
 npm install
 npm run build
-cd ..
 ```
 
 ### 3. Generate API Key
@@ -93,10 +94,10 @@ Add the following configuration to your Cursor MCP settings:
     "icp-coder": {
       "command": "node",
       "args": [
-        "ABSOLUTE_PATH_TO_dist/index.js"
+        "ABSOLUTE_PATH_TO_MCP_SERVER_dist/index.js"
       ],
       "env": {
-        "API_KEY": "YOUR_API_FROM_STEP_3",
+        "API_KEY": "YOUR_API_KEY_FROM_STEP_3",
         "BACKEND_URL": "http://localhost:8080"
       }
     }
@@ -113,21 +114,7 @@ Add the following configuration to your Cursor MCP settings:
 
 ## Optional Interfaces
 
-### REST API Server
-
-The REST API mirrors the MCP functionality and can be used by external services. Run these processes in separate terminals:
-
-```bash
-# Terminal 1: Authentication server (port 8001)
-set PYTHONPATH=.
-python -m uvicorn API.auth_server:app --reload --port 8001
-
-# Terminal 2: RAG API server (port 8000)
-set PYTHONPATH=.
-python -m uvicorn API.api_server:app --reload --port 8000
-```
-
-### Test Chat Completion API
+### Chat Completion API
 
 ```bash
 curl -X POST http://localhost:8080/v1/chat/completions \
@@ -155,14 +142,6 @@ curl -X POST http://localhost:8080/v1/chat/completions \
     "max_tokens": 2000,
     "conversation_id": 123
   }'
-```
-
-### Direct CLI Inference
-
-Run the standalone script to experiment with Gemini-powered RAG outside of MCP clients:
-
-```bash
-python rag/inference_gemini.py
 ```
 
 ## Integrations

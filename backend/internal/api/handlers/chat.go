@@ -152,6 +152,7 @@ func ChatCompletions(db *sql.DB) gin.HandlerFunc {
 			c.Request.Context(),
 			conversationAwareQuery,
 			ragResponse.CodeContexts,
+			ragResponse.DocsContexts,
 			req.Temperature,
 			req.MaxTokens,
 		)
