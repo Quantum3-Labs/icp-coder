@@ -1,0 +1,83 @@
+# Git files
+.git
+.gitignore
+.github
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Benchmark and test files
+benchmark/
+
+# MCP Server (Node.js project - not needed for backend Docker)
+mcp_server/
+
+# ICP/Dfinity configs (not needed for Docker build)
+dfx.json
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+backend/Dockerfile
+backend/docker-compose.yml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts and cache
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.cache/
+dist/
+build/
+
+# Go specific
+vendor/
+*.sum.lock
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+*.egg-info/
+
+# Data directories (will be mounted as volumes)
+data/
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS files
+Thumbs.db
+.DS_Store
+
