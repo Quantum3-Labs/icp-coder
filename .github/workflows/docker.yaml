@@ -1,0 +1,65 @@
+# name: Docker Build Check
+
+# on:
+#   pull_request:
+#     branches:
+#       - main
+#       - stg
+
+# env:
+#   AWS_REGION: ap-southeast-1
+
+# jobs:
+#   check-dockerfile:
+#     name: Check Dockerfile Build
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v4
+
+#       - name: Determine Environment
+#         id: determine_env
+#         run: |
+#           TARGET_BRANCH=${{ github.base_ref }}
+
+#           if [[ "$TARGET_BRANCH" == "main" ]]; then
+#             echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
+#             echo "ENVIRONMENT=prod" >> "$GITHUB_OUTPUT"
+#           elif [[ "$TARGET_BRANCH" == "stg" ]]; then
+#             echo "ENVIRONMENT=stg" >> "$GITHUB_ENV"
+#             echo "ENVIRONMENT=stg" >> "$GITHUB_OUTPUT"
+#           else
+#             echo "ENVIRONMENT=dev" >> "$GITHUB_ENV"
+#             echo "ENVIRONMENT=dev" >> "$GITHUB_OUTPUT"
+#           fi
+
+#           echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
+#           echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
+
+#       - name: Configure AWS Credentials
+#         uses: aws-actions/configure-aws-credentials@v2
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ env.AWS_REGION }}
+
+#       - name: Download Environment Variables from S3
+#         id: download-env
+#         continue-on-error: true
+#         run: |
+#           aws s3 cp s3://quantum3labs/${{ env.REPO_NAME }}.${{ env.ENVIRONMENT }}.env .env 2>/dev/null || touch .env
+#           echo "Environment variables status: $([ -s .env ] && echo 'Downloaded' || echo 'Using empty file')"
+
+#       - name: Build Docker Image
+#         id: build-image
+#         run: |
+#           IMAGE_TAG=pr-check-${{ github.event.pull_request.number }}
+#           echo "Building Docker image with tag: $IMAGE_TAG"
+#           docker build -t $IMAGE_TAG .
+
+#           echo "Verifying image build"
+#           docker image ls $IMAGE_TAG
+
+#           echo "Docker image built successfully"
+
+#           rm -f .env
