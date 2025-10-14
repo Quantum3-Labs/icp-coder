@@ -1,0 +1,9 @@
+.dfx/
+node_modules/
+.vscode/
+.DS_Store
+dist/
+out/
+*.wasm
+*.did
+

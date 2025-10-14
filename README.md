@@ -1,12 +1,12 @@
-﻿# Motoko Coder
+﻿# ICP Coder
 
 A Retrieval-Augmented Generation (RAG) pipeline for Motoko code search and code generation, powered by ChromaDB, local embeddings, and Google Gemini.
 
-**Project Demo (National Round)**: https://app.screencastify.com/watch/fGhZUe1zzkabRKVxm1wj
+**Project Demo (National Round)**: <https://app.screencastify.com/watch/fGhZUe1zzkabRKVxm1wj>
 
 ## MCP Server Overview
 
-Motoko Coder is built around an MCP (Model Context Protocol) server that streams Motoko-specific context directly into tools such as Cursor, Claude Desktop, and other MCP-compatible clients. The service sits on top of a local ChromaDB vector store and handles retrieval, formatting, and generation so your editor can deliver context-aware completions in real time.
+ICP Coder is built around an MCP (Model Context Protocol) server that streams Motoko-specific context directly into tools such as Cursor, Claude Desktop, and other MCP-compatible clients. The service sits on top of a local ChromaDB vector store and handles retrieval, formatting, and generation so your editor can deliver context-aware completions in real time.
 
 - Serve Motoko knowledge over HTTP or process-based MCP transports
 - Retrieve embeddings from ChromaDB populated with documentation and sample projects
@@ -17,6 +17,7 @@ Motoko Coder is built around an MCP (Model Context Protocol) server that streams
 <img width="1410" height="926" alt="Untitled-2025-07-18-1340" src="https://github.com/user-attachments/assets/19c42a00-8b9f-44d7-8ea1-ebde2861f4d0" />
 
 ## Features
+
 - Ingests and indexes all Motoko code samples from the `motoko_code_samples/` directory
 - Generates vector embeddings using the local SentenceTransformer model (`all-MiniLM-L6-v2`)
 - End-to-end RAG workflow for Motoko code search and question answering
@@ -28,6 +29,7 @@ Motoko Coder is built around an MCP (Model Context Protocol) server that streams
 ## Prerequisites
 
 ### Required Software
+
 - **Go 1.24+** - Backend API server (if run directly)
 - **Python 3.11+** - RAG pipeline and embedding generation (if run directly)
 - **Node.js 22+** - MCP server (mcp_server)
@@ -35,16 +37,19 @@ Motoko Coder is built around an MCP (Model Context Protocol) server that streams
 - **Make** - Build automation (pre-installed on Linux/Mac, [install on Windows](https://gnuwin32.sourceforge.net/packages/make.htm))
 
 ### Python Dependencies
+
 - [ChromaDB](https://www.trychroma.com/) - Vector database for embeddings
 - [sentence-transformers](https://www.sbert.net/) - Local embedding models
 - [tqdm](https://tqdm.github.io/) - Progress bars during ingestion
 - [python-dotenv](https://pypi.org/project/python-dotenv/) - Environment variable management
 
 ### API Keys
+
 - **Google Gemini API key** (required for code generation)
 - Optional: OpenAI API key or Claude API key (alternative providers)
 
 ### System Requirements
+
 - **~10GB of free storage** (local deployment with full dataset)
 
 ## Setup
@@ -78,7 +83,7 @@ npm run build
 
 Once the backend is running, navigate to the Swagger UI to register an account and generate an API key:
 
-1. Open your browser and go to: **http://localhost:8080/swagger/index.html**
+1. Open your browser and go to: **<http://localhost:8080/swagger/index.html>**
 2. Register a new account
 3. Login with your credentials
 4. Generate an API key (save this for the next step)
