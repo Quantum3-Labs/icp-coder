@@ -1,0 +1,33 @@
+version: '3.8'
+
+name: icp-coder
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icp-coder-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - data-volume:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 60s
+      timeout: 10s
+      start_period: 10m
+      retries: 3
+    networks:
+      - icp-coder-network
+
+volumes:
+  data-volume:
+    driver: local
+
+networks:
+  icp-coder-network:
+    driver: bridge

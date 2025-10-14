@@ -1,0 +1,10 @@
+# Python dependencies for backend data initialization
+
+# Core dependencies for data ingestion
+chromadb==0.5.18
+sentence-transformers==4.1.0
+
+# Utilities
+python-dotenv==1.0.1
+tqdm==4.66.5
+requests==2.32.3
