@@ -83,3 +83,4 @@ motoko_official_docs/
 
 # Node dependencies
 mcp_server/node_modules/
+node_mcp_server/node_modules/
