@@ -1,0 +1,109 @@
+name: Deploy to ECS
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECS_CLUSTER: prodCluster
+
+jobs:
+  check-commit:
+    runs-on: ubuntu-latest
+    outputs:
+      ENVIRONMENT: ${{ steps.check_commit.outputs.ENVIRONMENT }}
+      REPO_NAME: ${{ steps.check_commit.outputs.REPO_NAME }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Environment & Check Commit Message
+        id: check_commit
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
+
+          # Set environment based on branch
+          if [[ "$CURRENT_BRANCH" == "main" ]]; then
+            echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=prod" >> "$GITHUB_OUTPUT"
+          elif [[ "$CURRENT_BRANCH" == "stg" ]]; then
+            echo "ENVIRONMENT=stg" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=stg" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Workflow can only run on main or stg branches"
+            exit 1
+          fi
+
+          # Set repository name
+          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: check-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get Latest Image URI
+        run: |
+          REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          REPO_NAME=${{ needs.check-commit.outputs.REPO_NAME }}
+          ENVIRONMENT=${{ needs.check-commit.outputs.ENVIRONMENT }}
+
+          # Use the latest-{environment} tag
+          IMAGE_URI="${REGISTRY}/${REPO_NAME}:latest-${ENVIRONMENT}"
+          echo "Using image: ${IMAGE_URI}"
+          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+
+      - name: Download Task Definition
+        run: |
+          aws ecs describe-task-definition --task-definition def-${{ needs.check-commit.outputs.ENVIRONMENT }}-${{ needs.check-commit.outputs.REPO_NAME }} --query taskDefinition > task-definition.json
+
+          # Output the content for debugging
+          cat task-definition.json
+
+      - name: Update ECS Task Definition with Latest Image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ needs.check-commit.outputs.REPO_NAME }}
+          image: ${{ env.IMAGE_URI }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: service-${{ needs.check-commit.outputs.ENVIRONMENT }}-${{ needs.check-commit.outputs.REPO_NAME }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Notify Success to Slack Channel
+        id: slack-success
+        if: success()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          slack-message: "✅ Deployment Successful!\nRepository: ${{ needs.check-commit.outputs.REPO_NAME }}\nEnvironment: ${{ needs.check-commit.outputs.ENVIRONMENT }}\nBuild Status: ${{ job.status }}\nTriggered by: ${{ github.actor }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Failure to Slack Channel
+        id: slack-failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          slack-message: "❌ Deployment Failed!\nRepository: ${{ needs.check-commit.outputs.REPO_NAME }}\nEnvironment: ${{ needs.check-commit.outputs.ENVIRONMENT }}\nBuild Status: ${{ job.status }}\nTriggered by: ${{ github.actor }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
