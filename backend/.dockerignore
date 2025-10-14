@@ -34,11 +34,11 @@ temp/
 .DS_Store
 Thumbs.db
 
-# Environment files (copy manually if needed)
+# Environment files
 .env.local
 .env.*.local
 
-# Data directories (will be mounted as volumes)
+# Data directories
 data/
 chromadb_data/
 motoko_code_samples/

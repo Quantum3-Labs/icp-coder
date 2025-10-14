@@ -11,7 +11,8 @@ const VERSION = '0.1.0';
 const API_KEY_ENV = 'API_KEY';
 const API_KEY_FLAG = '--api-key';
 const BACKEND_URL_ENV = 'BACKEND_URL';
-const DEFAULT_BACKEND_BASE_URL = 'http://localhost:8080';
+const DEFAULT_BACKEND_BASE_URL =
+	process.env.PROD_BACKEND_URL || 'http://localhost:8080';
 
 type StartOptions = {
 	apiKey?: string;
