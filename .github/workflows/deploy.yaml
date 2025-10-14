@@ -22,7 +22,7 @@ jobs:
         run: |
           COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
-
+          
           # Set environment based on branch
           if [[ "$CURRENT_BRANCH" == "main" ]]; then
             echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
@@ -34,7 +34,7 @@ jobs:
             echo "::error::Workflow can only run on main or stg branches"
             exit 1
           fi
-
+          
           # Set repository name
           echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
           echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
@@ -59,7 +59,7 @@ jobs:
           REGISTRY=${{ steps.login-ecr.outputs.registry }}
           REPO_NAME=${{ needs.check-commit.outputs.REPO_NAME }}
           ENVIRONMENT=${{ needs.check-commit.outputs.ENVIRONMENT }}
-
+          
           # Use the latest-{environment} tag
           IMAGE_URI="${REGISTRY}/${REPO_NAME}:latest-${ENVIRONMENT}"
           echo "Using image: ${IMAGE_URI}"
@@ -68,7 +68,7 @@ jobs:
       - name: Download Task Definition
         run: |
           aws ecs describe-task-definition --task-definition def-${{ needs.check-commit.outputs.ENVIRONMENT }}-${{ needs.check-commit.outputs.REPO_NAME }} --query taskDefinition > task-definition.json
-
+          
           # Output the content for debugging
           cat task-definition.json
 
