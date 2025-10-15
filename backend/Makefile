@@ -1,5 +1,30 @@
 SHELL := /bin/sh
 PYTHON := python3
+PIP := pip3
+VENV_DIR := venv
+
+# Python dependency management
+.PHONY: venv
+venv:
+	@echo "Creating Python virtual environment..."
+	$(PYTHON) -m venv $(VENV_DIR)
+	@echo "Virtual environment created. Activate with: source $(VENV_DIR)/bin/activate"
+
+.PHONY: deps
+deps:
+	@echo "Installing Python dependencies..."
+	$(PIP) install -r requirements.txt
+
+.PHONY: deps-upgrade
+deps-upgrade:
+	@echo "Upgrading Python dependencies..."
+	$(PIP) install --upgrade -r requirements.txt
+
+.PHONY: install
+install: deps
+	@echo "Installing Go dependencies..."
+	go mod download
+	@echo "All dependencies installed!"
 
 .PHONY: run
 run: swagger
@@ -60,12 +85,12 @@ clean-data:
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker image..."
-	docker-compose build
+	docker compose build
 
 .PHONY: docker-up
 docker-up:
 	@echo "Starting Docker containers..."
-	docker-compose up -d
+	docker compose up -d
 	@echo "Backend is running at http://localhost:8080"
 
 .PHONY: up
@@ -76,32 +101,38 @@ up:
 .PHONY: docker-down
 docker-down:
 	@echo "Stopping Docker containers..."
-	docker-compose down
+	docker compose down
 
 .PHONY: docker-logs
 docker-logs:
 	@echo "Viewing Docker logs (Ctrl+C to exit)..."
-	docker-compose logs -f
+	docker compose logs -f
 
 .PHONY: docker-restart
 docker-restart:
 	@echo "Restarting Docker containers..."
-	docker-compose restart
+	docker compose restart
 
 .PHONY: docker-rebuild
 docker-rebuild:
 	@echo "Rebuilding and restarting Docker containers..."
-	docker-compose up -d --build
+	docker compose up -d --build
 
 .PHONY: docker-clean
 docker-clean:
 	@echo "Stopping and removing Docker containers and volumes..."
-	docker-compose down -v
+	docker compose down -v
 	@echo "Docker cleanup complete."
 
 .PHONY: help
 help:
 	@echo "Available commands:"
+	@echo ""
+	@echo "Setup & Dependencies:"
+	@echo "  make install          - Install all dependencies (Python + Go)"
+	@echo "  make deps             - Install Python dependencies from requirements.txt"
+	@echo "  make deps-upgrade     - Upgrade Python dependencies"
+	@echo "  make venv             - Create Python virtual environment"
 	@echo ""
 	@echo "Development:"
 	@echo "  make run              - Run the backend server (auto-generates Swagger docs)"
@@ -121,10 +152,9 @@ help:
 	@echo "Docker:"
 	@echo "  make docker-build     - Build Docker image"
 	@echo "  make docker-up        - Start Docker containers"
+	@echo "  make up               - Build and start Docker containers (docker-build + docker-up)"
 	@echo "  make docker-down      - Stop Docker containers"
 	@echo "  make docker-logs      - View Docker logs (follow mode)"
 	@echo "  make docker-restart   - Restart Docker containers"
 	@echo "  make docker-rebuild   - Rebuild and restart containers"
 	@echo "  make docker-clean     - Remove containers and volumes"
-	@echo "  make docker-ps        - Show container status"
-	@echo "  make docker-shell     - Open shell in backend container"

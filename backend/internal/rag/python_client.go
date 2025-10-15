@@ -18,8 +18,9 @@ type PythonClient struct {
 
 // RAGRequest represents the input to the Python script
 type RAGRequest struct {
-	Query    string `json:"query"`
-	NResults int    `json:"n_results"`
+	Query       string `json:"query"`
+	NResults    int    `json:"n_results"`
+	DocsResults int    `json:"docs_results"`
 }
 
 // RAGResponse represents the output from the Python script
@@ -54,14 +55,15 @@ func (pc *PythonClient) Retrieve(ctx context.Context, query string, nResults int
 	if query == "" {
 		return nil, fmt.Errorf("query cannot be empty")
 	}
-	if nResults < 1 || nResults > 20 {
-		return nil, fmt.Errorf("n_results must be between 1 and 20")
+	if nResults < 1 || nResults > 10 {
+		nResults = 10
 	}
 
 	// Create request
 	request := RAGRequest{
-		Query:    query,
-		NResults: nResults,
+		Query:       query,
+		NResults:    nResults,
+		DocsResults: nResults,
 	}
 
 	requestJSON, err := json.Marshal(request)

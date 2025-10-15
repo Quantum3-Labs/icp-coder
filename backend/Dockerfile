@@ -26,6 +26,11 @@ COPY --from=go-builder /build/server /app/server
 COPY --from=go-builder /build/docs /app/docs
 
 COPY requirements.txt /app/requirements.txt
+
+# Install PyTorch CPU-only version
+RUN pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/cpu
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY scripts/ /app/scripts/
@@ -39,8 +44,5 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8080
 
 VOLUME ["/app/data"]
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 CMD ["/app/server"]
