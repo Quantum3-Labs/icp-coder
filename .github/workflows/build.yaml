@@ -21,7 +21,7 @@ jobs:
         run: |
           COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
-
+          
           # Set environment based on branch
           if [[ "$CURRENT_BRANCH" == "main" ]]; then
             echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
@@ -33,7 +33,7 @@ jobs:
             echo "::error::Workflow can only run on main or stg branches"
             exit 1
           fi
-
+          
           # Set repository name
           echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
           echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
@@ -80,13 +80,13 @@ jobs:
           REPOSITORY: ${{ needs.check-commit.outputs.REPO_NAME }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG-${{ needs.check-commit.outputs.ENVIRONMENT }} .
+          docker build -f backend/Dockerfile -t $REGISTRY/$REPOSITORY:$IMAGE_TAG-${{ needs.check-commit.outputs.ENVIRONMENT }} backend
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG-${{ needs.check-commit.outputs.ENVIRONMENT }}
           docker tag $REGISTRY/$REPOSITORY:$IMAGE_TAG-${{ needs.check-commit.outputs.ENVIRONMENT }} $REGISTRY/$REPOSITORY:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}
           docker push $REGISTRY/$REPOSITORY:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}
-
+          
           echo "Successfully pushed image: $REGISTRY/$REPOSITORY:$IMAGE_TAG"
           echo "Successfully pushed image: $REGISTRY/$REPOSITORY:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}"
-
+          
           # For security, remove the .env file
           rm -f .env
