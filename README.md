@@ -109,6 +109,35 @@ Add the following configuration to your Cursor MCP settings:
 }
 ```
 
+## Development Mode
+
+For active development with live reload and debugging:
+
+```bash
+cd backend
+
+# Use development environment
+cp .env.dev.example .env.dev
+# Edit .env.dev and add your API keys
+
+# Start with live reload (uses Air)
+make dev
+
+# View logs
+make dev-logs
+
+# Stop
+make dev-down
+```
+
+**Development features:**
+- Automatic rebuild on code changes using Air
+- Debug mode with verbose logging
+- Source code mounted as volume for instant changes
+- Swagger docs auto-generated on every build
+
+See `backend/Makefile` for all development commands (`make dev-*`).
+
 ## How It Works
 
 1. **User Query**: You ask for help with Motoko code, mentioning the MCP tool you want to use.
