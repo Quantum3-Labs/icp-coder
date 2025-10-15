@@ -63,13 +63,11 @@ cd backend
 cp .env.example .env
 # Edit .env file and add your configuration (LLM API key (currently supporting Gemini, Claude, OpenAI), database settings, etc.)
 make up
-cd ..
 ```
 
-**Important**:
-
-- Only set one LLM provider and its key at a time.
-- Make sure to update the values in `.env` with your actual credentials before running `make docker-build`.
+**Important**: 
+  - Only set one LLM provider and its key at a time.
+  - Make sure to update the values in `.env` with your actual credentials before running `make up`.
 
 ### 2. Node MCP Server Setup
 
@@ -157,36 +155,41 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 ## Project Structure
 
 ```
-ICP_Coder/
-|-- API/
-|   |-- api_server.py
-|   |-- auth_server.py
-|   |-- client_example.py
-|   |-- database.py
-|   |-- mcp_api_server.py
-|   |-- mcp_server.py
-|   `-- README.md
-|-- MCP_Server/
-|   `-- server.py
-|-- automated_ingestion_job/
-|   `-- scheduler.py
-|-- ingest/
-|   |-- motoko_docs_ingester.py
-|   `-- motoko_samples_ingester.py
-|-- motoko_code_samples/
-|-- rag/
-|   |-- inference_base.py
-|   `-- inference_gemini.py
-|-- chromadb_data/
-|-- requirements.txt
-|-- RAG_PIPELINE_DIAGRAM.md
-|-- RAG_APPROACH_DIAGRAM.md
-`-- README.md
+icp-coder/
+├── backend/                        # Go backend server
+│   ├── cmd/
+│   │   └── server/
+│   │       └── main.go            # Main entry point
+│   ├── internal/
+│   │   ├── api/
+│   │   │   ├── handlers/          # HTTP request handlers
+│   │   │   ├── middleware/        # CORS, auth middleware
+│   │   │   └── router.go          # API routing
+│   │   ├── auth/                  # Authentication service
+│   │   ├── codegen/               # Code generation with LLM providers
+│   │   ├── database/              # Database connection & queries
+│   │   └── rag/                   # RAG service & Python client
+│   ├── scripts/                   # Python ingestion scripts
+│   ├── docs/                      # API documentation
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── Makefile
+│   ├── go.mod
+│   └── requirements.txt           # Python dependencies for scripts
+├── mcp_server/                    # MCP (Model Context Protocol) server
+│   ├── src/
+│   │   ├── tools/
+│   │   │   ├── generate-motoko-code.tool.ts
+│   │   │   └── get-motoko-context.tool.ts
+│   │   └── index.ts              # MCP server entry point
+│   ├── package.json
+│   └── tsconfig.json
+├── RAG_PIPELINE_DIAGRAM.md
+├── RAG_APPROACH_DIAGRAM.md
+└── README.md
 ```
 
 ## Documentation
 
 - **System Architecture**: `RAG_PIPELINE_DIAGRAM.md`
 - **RAG Approach**: `RAG_APPROACH_DIAGRAM.md`
-- **API Documentation**: `API/README.md`
-- **MCP Specification**: `API/MCP_SPECIFICATION.md`
