@@ -1,0 +1,36 @@
+version: '3.8'
+
+name: icp-coder
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: icp-coder-backend-dev
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.dev  # Load development environment variables
+    environment:
+      - CGO_ENABLED=1  # Required for Go build in dev
+    volumes:
+      # Mount source code for live reload
+      - .:/app
+      # Use named volume for Go module cache (faster rebuilds)
+      - go-pkg-cache:/go/pkg
+      # Persistent data volume
+      - data-volume:/app/data
+    restart: unless-stopped
+    networks:
+      - icp-coder-network
+
+volumes:
+  go-pkg-cache:
+    driver: local
+  data-volume:
+    driver: local
+
+networks:
+  icp-coder-network:
+    driver: bridge

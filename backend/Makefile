@@ -81,7 +81,7 @@ clean-data:
 	rm -f data/*.db-*
 	@echo "Data cleaned."
 
-# Docker commands
+# Docker commands (Production)
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker image..."
@@ -124,6 +124,50 @@ docker-clean:
 	docker compose down -v
 	@echo "Docker cleanup complete."
 
+# Docker commands (Development)
+.PHONY: dev-build
+dev-build:
+	@echo "Building development Docker image..."
+	docker compose -f docker-compose.dev.yml build
+
+.PHONY: dev-up
+dev-up:
+	@echo "Starting development containers with live reload..."
+	docker compose -f docker-compose.dev.yml up -d
+	@echo "Development backend is running at http://localhost:8080"
+	@echo "Live reload enabled - code changes will trigger automatic rebuilds"
+
+.PHONY: dev
+dev:
+	$(MAKE) dev-build
+	$(MAKE) dev-up
+
+.PHONY: dev-down
+dev-down:
+	@echo "Stopping development containers..."
+	docker compose -f docker-compose.dev.yml down
+
+.PHONY: dev-logs
+dev-logs:
+	@echo "Viewing development logs (Ctrl+C to exit)..."
+	docker compose -f docker-compose.dev.yml logs -f
+
+.PHONY: dev-restart
+dev-restart:
+	@echo "Restarting development containers..."
+	docker compose -f docker-compose.dev.yml restart
+
+.PHONY: dev-rebuild
+dev-rebuild:
+	@echo "Rebuilding and restarting development containers..."
+	docker compose -f docker-compose.dev.yml up -d --build
+
+.PHONY: dev-clean
+dev-clean:
+	@echo "Stopping and removing development containers and volumes..."
+	docker compose -f docker-compose.dev.yml down -v
+	@echo "Development cleanup complete."
+
 .PHONY: help
 help:
 	@echo "Available commands:"
@@ -149,7 +193,7 @@ help:
 	@echo "  make setup            - Complete setup (clone + ingest)"
 	@echo "  make clean-data       - Remove all cloned data and ChromaDB"
 	@echo ""
-	@echo "Docker:"
+	@echo "Docker (Production):"
 	@echo "  make docker-build     - Build Docker image"
 	@echo "  make docker-up        - Start Docker containers"
 	@echo "  make up               - Build and start Docker containers (docker-build + docker-up)"
@@ -158,3 +202,13 @@ help:
 	@echo "  make docker-restart   - Restart Docker containers"
 	@echo "  make docker-rebuild   - Rebuild and restart containers"
 	@echo "  make docker-clean     - Remove containers and volumes"
+	@echo ""
+	@echo "Docker (Development):"
+	@echo "  make dev-build        - Build development Docker image"
+	@echo "  make dev-up           - Start development containers with live reload"
+	@echo "  make dev              - Build and start dev containers (dev-build + dev-up)"
+	@echo "  make dev-down         - Stop development containers"
+	@echo "  make dev-logs         - View development logs (follow mode)"
+	@echo "  make dev-restart      - Restart development containers"
+	@echo "  make dev-rebuild      - Rebuild and restart dev containers"
+	@echo "  make dev-clean        - Remove dev containers and volumes"
