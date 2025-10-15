@@ -189,7 +189,12 @@ icp-coder/
 └── README.md
 ```
 
+## High Level Architecture
+
+<img width="1499" height="1051" alt="image" src="https://github.com/user-attachments/assets/506d2404-58f2-4789-b60b-8c535d1e2179" />
+
 ## Documentation
 
+- **High-Level Architecture**: `ARCHITECTURE_DIAGRAM.md`
 - **System Architecture**: `RAG_PIPELINE_DIAGRAM.md`
 - **RAG Approach**: `RAG_APPROACH_DIAGRAM.md`

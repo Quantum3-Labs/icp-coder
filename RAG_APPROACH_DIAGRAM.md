@@ -4,32 +4,37 @@
 
 ```mermaid
 graph LR
-    A["User Query: How to write a counter canister?"] --> B
-    B["Query Embedding: SentenceTransformer all-MiniLM-L6-v2"] --> C
-    C["Vector Similarity Search: ChromaDB"] --> D
-    D["Retrieve Relevant Motoko Code Samples and TOML Configs"] --> E
-    E["Build Context: [retrieved code samples], Request: [user query]"] --> F
-    F["Gemini 2.5 Flash: Generate Response"] --> G
-    G["Generated Answer with Motoko Code Examples"]
-    H["Knowledge Base: ChromaDB Collection, Motoko Code Samples, TOML Configurations, Project Metadata"] --> C
-    %% Styling removed for GitHub compatibility
+    IDE["IDE / API Client<br/>(Cursor, Claude, HTTP)"] --> MCP["MCP Server<br/>(Node.js)"]
+    MCP -->|REST + API key| GoAPI["Go Backend<br/>(Gin)"]
+    GoAPI -->|Subprocess JSON| PyRetriever["Python rag_retriever.py"]
+    PyRetriever --> Embed["SentenceTransformer<br/>all-MiniLM-L6-v2"]
+    Embed --> Chroma["ChromaDB<br/>motoko_code_samples + motoko_docs"]
+    Chroma --> PyRetriever
+    PyRetriever --> Context["Code & Docs Context<br/>with metadata + warning"]
+    Context --> GoAPI
+    GoAPI --> Provider["Codegen Services<br/>(Gemini / OpenAI / Claude)"]
+    Provider --> Response["Motoko-focused Response<br/>code + explanation"]
+    Response --> MCP --> IDE
 ```
 
 ## Detailed RAG Flow
 
 ```mermaid
 flowchart TD
-    Start([User asks Motoko question]) --> Query
-    Query["Extract user question"] --> Embed
-    Embed["Generate embedding using SentenceTransformer"] --> Search
-    Search["Search ChromaDB for similar code samples"] --> Filter
-    Filter["Filter by relevance and project context"] --> Context
-    Context["Assemble context from Motoko code files, TOML configurations, Project metadata"] --> Prompt
-    Prompt["Create prompt: Context + User Question"] --> LLM
-    LLM["Gemini 2.5 Flash generates response"] --> Response
-    Response["Return structured answer with code examples"] --> End([User receives answer])
-    KB["Knowledge Base: ChromaDB Collection"] --> Search
-    %% Styling removed for GitHub compatibility
+    Start([User asks Motoko question]) --> Intake["MCP server forwards request"]
+    Intake --> Auth["Go backend authenticates API key / Basic Auth"]
+    Auth --> Dispatch["Go RAG handler normalises request"]
+    Dispatch --> Subprocess["Invoke Python rag_retriever.py"]
+    Subprocess --> Embedding["Compute embeddings (all-MiniLM-L6-v2)"]
+    Embedding --> Retrieval["Query ChromaDB code + docs collections"]
+    Retrieval --> Merge["Return contexts + metadata + warnings"]
+    Merge --> Format["Go backend formats Markdown context block"]
+    Format --> ProviderSelect["Select codegen provider from env"]
+    ProviderSelect --> LLM["Call Gemini / OpenAI / Claude"]
+    LLM --> Assemble["Assemble response payload (code, explanation, context)"]
+    Assemble --> End([MCP server delivers result to user])
+    Chroma[(ChromaDB)] --> Retrieval
+    DataCache[(data/ repo cache)] --> Subprocess
 ```
 
 ## RAG Components Breakdown
@@ -38,16 +43,16 @@ flowchart TD
 ```mermaid
 graph TB
     subgraph "Retrieval Components"
-        A1["User Query"]
-        A2["Query Embedding: 384-dimensional vector"]
-        A3["Vector Similarity Search: Cosine similarity"]
-        A4["Top-K Retrieval: Most relevant documents"]
+        A1["Normalised Query"]
+        A2["SentenceTransformer<br/>384-dim embedding"]
+        A3["Similarity Search<br/>ChromaDB client"]
+        A4["Top-K Selection<br/>code + docs"]
     end
     subgraph "Knowledge Base"
-        B1["Motoko Code Files: *.mo"]
-        B2["TOML Configurations: *.toml"]
-        B3["Project Metadata: file paths, structure"]
-        B4["Embeddings: pre-computed vectors"]
+        B1["Motoko Code Snippets<br/>*.mo"]
+        B2["Documentation Chunks<br/>*.md / *.mdx"]
+        B3["Metadata<br/>paths, project folders, chunk titles"]
+        B4["Vector Store<br/>motoko_code_samples + motoko_docs"]
     end
     A1 --> A2
     A2 --> A3
@@ -56,67 +61,62 @@ graph TB
     A4 --> B2
     A4 --> B3
     A4 --> B4
-    %% Styling removed for GitHub compatibility
 ```
 
 ### **2. Generation Phase**
 ```mermaid
 graph TB
     subgraph "Context Assembly"
-        C1["Retrieved Documents"]
-        C2["Metadata Information"]
-        C3["User Query"]
-        C4["Structured Prompt"]
+        C1["Code contexts<br/>with distances"]
+        C2["Docs contexts<br/>with warnings"]
+        C3["Original user query"]
+        C4["Markdown formatted context"]
     end
-    subgraph "LLM Generation"
-        D1["Gemini 2.5 Flash"]
-        D2["Temperature: 0.7"]
-        D3["Max Tokens: 4096"]
-        D4["Top-p: 0.9"]
+    subgraph "Code Generation"
+        D1["Provider factory<br/>(Gemini / OpenAI / Claude)"]
+        D2["Runtime options<br/>temperature, max tokens"]
     end
     subgraph "Response Format"
-        E1["Code Examples"]
-        E2["Explanations"]
-        E3["Best Practices"]
-        E4["Project Structure"]
+        E1["Generated Motoko code"]
+        E2["Explanation / reasoning"]
+        E3["Returned context block"]
+        E4["Error / warning messages"]
     end
     C1 --> C4
     C2 --> C4
-    C3 --> C4
+    C3 --> D1
     C4 --> D1
     D1 --> D2
-    D1 --> D3
-    D1 --> D4
     D1 --> E1
     D1 --> E2
-    D1 --> E3
+    C4 --> E3
     D1 --> E4
-    %% Styling removed for GitHub compatibility
 ```
 
 ## Key RAG Features
 
 ### **Enhanced Retrieval**
-- **Dual File Types**: Both `.mo` and `.toml` files for complete context
-- **Project Awareness**: Understands project structure and dependencies
-- **Metadata Enrichment**: File paths, project info, TOML presence indicators
-- **Semantic Search**: Uses SentenceTransformer for understanding code meaning
+- **Code + Docs Coverage**: Retrieves Motoko `.mo` files and Markdown documentation chunks.
+- **Metadata Enrichment**: Includes file paths, folders, warnings, and distance scores.
+- **Semantic Search**: Embeddings powered by SentenceTransformer `all-MiniLM-L6-v2`.
+- **Python Bridge**: Dedicated script encapsulates ChromaDB access and health checks.
 
 ### **Context Assembly**
-- **Multi-file Context**: Combines relevant code samples and configurations
-- **Structured Prompts**: Clear separation between context and user query
-- **Project Metadata**: Includes file locations and project structure info
+- **Markdown Context Block**: Go backend returns a structured context payload for downstream tools.
+- **Configurable Fan-out**: `n_results` validated across API and MCP tooling.
+- **Warning Propagation**: Missing collections or ingest issues surface as warnings.
+- **Reusable Service Layer**: Go RAG service exposes retrieval to both generation and retrieval endpoints.
 
 ### **Generation Quality**
-- **Gemini 2.5 Flash**: Latest model for high-quality code generation
-- **Temperature Control**: Balanced creativity and accuracy
-- **Token Management**: Optimized for code generation tasks
-- **OpenAI Compatibility**: Standard response format for easy integration
+- **Multi-provider Support**: Gemini, OpenAI, or Claude selected at runtime via env vars.
+- **Parameter Handling**: Temperature and token limits forwarded from client requests.
+- **Streaming-ready**: Go handlers structure responses for API and MCP clients.
+- **Error Transparency**: Provider errors bubbled back with contextual messaging.
 
 ### **Benefits of This RAG Approach**
 
-1. **Accurate Code Generation**: Grounded in real Motoko examples
-2. **Project Context**: Understands dependencies and configurations
-3. **Up-to-date Knowledge**: Based on current Motoko code samples
-4. **Scalable**: Can handle large codebases efficiently
-5. **Maintainable**: Easy to update with new code samples 
+1. **Accurate Code Generation**: Responses stay grounded in retrieved Motoko code and docs.
+2. **Project Awareness**: Metadata preserves folder structure and documentation context.
+3. **Up-to-date Knowledge**: Ingestion scripts can refresh samples and docs on demand.
+4. **Flexible Providers**: Swap LLM vendors without changing clients.
+5. **Operational Visibility**: Warnings, logging, and health checks simplify troubleshooting.
