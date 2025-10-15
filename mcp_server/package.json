@@ -1,16 +1,47 @@
 {
-	"name": "icp-coder-mcp-server",
+	"name": "@quantum3labs/icp-coder",
 	"version": "0.1.0",
-	"description": "Model Context Protocol server that assists with generating production-ready code in Motoko language",
+	"description": "A Retrieval-Augmented Generation MCP server for Motoko code search and code generation",
+	"author": "quantum3labs",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Quantum3-Labs/icp-coder.git"
+	},
+	"homepage": "https://github.com/Quantum3-Labs/icp-coder#readme",
+	"bugs": {
+		"url": "https://github.com/Quantum3-Labs/icp-coder/issues"
+	},
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"motoko",
+		"icp",
+		"internet-computer",
+		"code-generation",
+		"rag",
+		"assistant",
+		"ai",
+		"llm",
+		"chromadb",
+		"claude",
+		"openai",
+		"gemini",
+		"dfx"
+	],
+	"files": [
+		"dist",
+		"README.md"
+	],
 	"type": "module",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"bin": {
-		"icp-coder-mcp-server": "dist/index.js"
+		"icp-coder": "dist/index.js"
 	},
 	"scripts": {
 		"build": "tsc --project tsconfig.json",
-		"build:prod": "PROD_BACKEND_URL=http://localhost:8080 npm run build",
+		"build:prod": "PROD_BACKEND_URL=https://icp-coder.q3labs.io npm run build",
 		"dev": "tsx --watch src/index.ts",
 		"start": "node dist/index.js",
 		"clean": "rm -rf dist"
