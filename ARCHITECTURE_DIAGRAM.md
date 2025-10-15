@@ -51,8 +51,3 @@ graph TD
     retriever --> rag
     tools -->|Responses| IDE
 ```
-
-**Legend**
-- Solid arrows indicate the primary request flow or data movement.
-- Subgraphs group components that run within the same runtime or concern.
-- Storage nodes with rounded corners represent persistent state managed by the system.
