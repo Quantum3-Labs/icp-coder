@@ -191,5 +191,6 @@ icp-coder/
 
 ## Documentation
 
+- **High-Level Architecture**: `ARCHITECTURE_DIAGRAM.md`
 - **System Architecture**: `RAG_PIPELINE_DIAGRAM.md`
 - **RAG Approach**: `RAG_APPROACH_DIAGRAM.md`
