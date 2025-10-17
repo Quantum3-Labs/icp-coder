@@ -65,6 +65,8 @@ cp .env.example .env
 make up
 ```
 
+Set `PUBLIC_BACKEND_URL` to the URL where the backend is reachable. Use `http://localhost:8080` for local development and `https://icp-coder.q3labs.io` (or your production domain) when deploying so the Swagger UI points to the correct host.
+
 **Important**: 
   - Only set one LLM provider and its key at a time.
   - Make sure to update the values in `.env` with your actual credentials before running `make up`.
