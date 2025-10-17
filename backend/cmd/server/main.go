@@ -2,10 +2,13 @@ package main
 
 import (
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 
+	docs "github.com/Quantum3-Labs/icp-coder/backend/docs"
 	"github.com/Quantum3-Labs/icp-coder/backend/internal/api"
+	"github.com/Quantum3-Labs/icp-coder/backend/internal/api/middleware"
 	"github.com/Quantum3-Labs/icp-coder/backend/internal/database"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -36,6 +39,20 @@ func isDataDirEmpty(dataDir string) bool {
 	return len(entries) == 0
 }
 
+func resolveDataDirectories() (string, string) {
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "data"
+	}
+
+	chromaDBDir := os.Getenv("CHROMADB_PATH")
+	if chromaDBDir == "" {
+		chromaDBDir = "data/chromadb"
+	}
+
+	return dataDir, chromaDBDir
+}
+
 // runPythonScript executes a Python script
 func runPythonScript(scriptPath string, args ...string) error {
 	pythonExec := os.Getenv("PYTHON_EXECUTABLE")
@@ -58,15 +75,7 @@ func runPythonScript(scriptPath string, args ...string) error {
 // initializeDataIfNeeded checks if data directory is empty and runs initialization scripts
 func initializeDataIfNeeded() error {
 	// Get directories from environment variables
-	dataDir := os.Getenv("DATA_DIR")
-	if dataDir == "" {
-		dataDir = "data" // fallback to local path
-	}
-
-	chromaDBDir := os.Getenv("CHROMADB_PATH")
-	if chromaDBDir == "" {
-		chromaDBDir = "data/chromadb" // fallback to local path
-	}
+	dataDir, chromaDBDir := resolveDataDirectories()
 
 	cloneReposScript := os.Getenv("PYTHON_CLONE_SCRIPT")
 	if cloneReposScript == "" {
@@ -129,16 +138,57 @@ func initializeDataIfNeeded() error {
 	return nil
 }
 
+// configureSwagger updates the generated swagger spec with the public backend URL.
+func configureSwagger() {
+	const defaultURL = "http://localhost:8080"
+
+	publicURL := os.Getenv("PUBLIC_BACKEND_URL")
+	if publicURL == "" {
+		publicURL = defaultURL
+	}
+
+	parsedURL, err := url.Parse(publicURL)
+	if err != nil || parsedURL.Host == "" {
+		log.Printf("Warning: invalid PUBLIC_BACKEND_URL=%q, falling back to %s", publicURL, defaultURL)
+		parsedURL, _ = url.Parse(defaultURL)
+	}
+
+	docs.SwaggerInfo.Host = parsedURL.Host
+
+	if parsedURL.Scheme != "" {
+		docs.SwaggerInfo.Schemes = []string{parsedURL.Scheme}
+	} else {
+		docs.SwaggerInfo.Schemes = []string{"http"}
+	}
+}
+
 func main() {
 	// Load environment variables from .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		log.Println("Info: .env file not found, using environment variables from system")
 	}
 
-	// Initialize data if needed
-	if err := initializeDataIfNeeded(); err != nil {
-		log.Fatalf("Failed to initialize data: %v", err)
+	const initMessage = "Backend is initializing data. Please try again shortly."
+	dataDir, chromaDBDir := resolveDataDirectories()
+	needsInitialization := isDataDirEmpty(dataDir) || isDataDirEmpty(chromaDBDir)
+
+	if needsInitialization {
+		middleware.SetMaintenanceMode(true, initMessage)
+	} else {
+		middleware.SetMaintenanceMode(false)
 	}
+
+	go func() {
+		if err := initializeDataIfNeeded(); err != nil {
+			log.Printf("Failed to initialize data: %v", err)
+			middleware.SetMaintenanceMode(true, "Initialization failed. Please check server logs.")
+			return
+		}
+		middleware.SetMaintenanceMode(false)
+	}()
+
+	// Configure swagger host/scheme for the current environment
+	configureSwagger()
 
 	// Initialize database
 	db, err := database.InitDB()
@@ -154,6 +204,7 @@ func main() {
 
 	// Create Gin router
 	router := gin.Default()
+	router.Use(middleware.MaintenanceModeMiddleware())
 
 	// Setup routes
 	api.SetupRoutes(router, db)
