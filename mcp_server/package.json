@@ -1,5 +1,5 @@
 {
-	"name": "@quantum3labs/icp-coder",
+	"name": "@q3labs/icp-coder",
 	"version": "0.1.0",
 	"description": "A Retrieval-Augmented Generation MCP server for Motoko code search and code generation",
 	"author": "quantum3labs",
