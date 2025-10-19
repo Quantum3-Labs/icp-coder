@@ -1,0 +1,69 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
+name: Publish MCP Server to npm
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-southeast-1
+  PACKAGE_DIR: mcp_server
+
+jobs:
+  check-commit:
+    runs-on: ubuntu-latest
+    outputs:
+      ENVIRONMENT: ${{ steps.check_commit.outputs.ENVIRONMENT }}
+      REPO_NAME: ${{ steps.check_commit.outputs.REPO_NAME }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Environment & Check Commit Message
+        id: check_commit
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
+
+          if [[ "$CURRENT_BRANCH" == "main" ]]; then
+            echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=prod" >> "$GITHUB_OUTPUT"
+          elif [[ "$CURRENT_BRANCH" == "stg" ]]; then
+            echo "ENVIRONMENT=stg" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=stg" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Workflow can only run on main or stg branches"
+            exit 1
+          fi
+
+          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: check-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: ${{ env.PACKAGE_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ env.PACKAGE_DIR }}
+
+      - name: Build package
+        run: npm run build
+        working-directory: ${{ env.PACKAGE_DIR }}
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: npm publish --access public
+        working-directory: ${{ env.PACKAGE_DIR }}
