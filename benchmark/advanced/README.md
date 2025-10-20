@@ -9,14 +9,11 @@ Create a Motoko project using dfx tool to build the following:
 - Create a token with name CQT
 - Function: 
     - transfer, mint (only the owner can mint)
-    - generate random number function
-    - guessing game: if user pick the same number as the generated one, the user will win some amount of token
-
 Rules:
 - Must meet all requirements above
 - Handle any possible errors
 - Adhere to the motoko documentation for best practice/syntax
-
+- Can apply the changes in this current project 
 Use motoko-coder MCP server to help you with development (this line is only for icp-coder version)
 
 ```
