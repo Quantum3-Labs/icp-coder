@@ -1,34 +1,31 @@
 # ICP Coder MCP Server
 
-A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that provides Motoko programming assistance through Retrieval-Augmented Generation (RAG). This server integrates with IDEs like [Cursor](https://cursor.sh), [Claude Desktop](https://claude.ai/download), and other MCP-compatible tools to deliver context-aware code suggestions and generation for the [Internet Computer](https://internetcomputer.org).
+A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that provides **AI-powered Motoko programming assistance** through Retrieval-Augmented Generation (RAG). Get intelligent code suggestions, context-aware completions, and instant access to Motoko documentation directly in your IDE.
 
-## Features
+## ✨ Features
 
-- **Context Retrieval**: Search through 40+ Motoko code samples and official documentation
-- **Code Generation**: Generate Motoko code with LLM assistance (Gemini/OpenAI/Claude)
-- **RAG-Powered**: Combines vector similarity search with LLM generation
-- **IDE Integration**: Works seamlessly with Cursor, Claude Desktop, and MCP-compatible editors
-- **Type-Safe**: Built with TypeScript and Zod validation
+- 🔍 **Smart Context Retrieval** - Search through 40+ Motoko code samples and official documentation
+- 🤖 **AI Code Generation** - Generate Motoko code with LLM assistance (Gemini/OpenAI/Claude)
+- ⚡ **RAG-Powered** - Combines vector similarity search with LLM generation for accurate results
+- 🎯 **IDE Integration** - Works seamlessly with Cursor, Claude Desktop, and MCP-compatible editors
+- 🔒 **Type-Safe** - Built with TypeScript and Zod validation
+- 🌐 **Production Ready** - Backed by a robust Go backend with ChromaDB vector store
 
-## Getting an API Key
+## 🚀 Quick Start
 
-Before using this MCP server, you need to obtain an API key from the ICP Coder backend.
+### Step 1: Get an API Key
 
-**For detailed setup instructions**, including how to:
-- Run the backend server (locally or use production)
-- Register an account
-- Generate your API key
+You need an API key from the ICP Coder backend to use this MCP server.
 
-Please refer to the [main repository README](https://github.com/Quantum3-Labs/icp-coder#readme) for complete setup instructions.
+1. Visit the Swagger UI: **<https://icp-coder.q3labs.io/swagger/index.html>**
+2. Register a new account via `/api/v1/auth/register` endpoint
+3. Login using `/api/v1/auth/login` endpoint
+4. Generate your API key from `/api/v1/keys` endpoint
+5. **Save this key** - you'll need it for the next step
 
-**Quick summary:**
-1. Access the Swagger UI at `https://icp-coder.q3labs.io/swagger/index.html` (or your backend URL)
-2. Register a new account
-3. Login with your credentials
-4. Generate an API key from the `/api/v1/keys` endpoint
-5. Save the API key for use in your IDE configuration below
+### Step 2: Configure in Cursor
 
-## Cursor Config
+Add this configuration to your Cursor MCP settings file at `~/.cursor/mcp.json`:
 
 ```json
 {
@@ -37,7 +34,7 @@ Please refer to the [main repository README](https://github.com/Quantum3-Labs/ic
       "command": "npx",
       "args": [
         "-y",
-        "@quantum3labs/icp-coder"
+        "@q3labs/icp-coder"
       ],
       "env": {
         "API_KEY": "your-api-key-here",
@@ -48,18 +45,139 @@ Please refer to the [main repository README](https://github.com/Quantum3-Labs/ic
 }
 ```
 
-## Available Tools
+**Important:**
 
-### 1. `get_motoko_context`
+- Replace `your-api-key-here` with your actual API key from Step 1
+- Use `https://icp-coder.q3labs.io` for production (recommended)
+- Use `http://localhost:8080` if you're running the backend locally
 
-Retrieves relevant Motoko code snippets and documentation from the RAG system.
+### Step 3: Restart Cursor
 
-### 2. `generate_motoko_code`
+**Completely restart Cursor** (not just reload) for the changes to take effect.
 
-MIT License - see [LICENSE](https://github.com/Quantum3-Labs/icp-coder/blob/main/LICENSE) file for details.
+## 🛠️ Available Tools
 
-## Support
+Once configured, you'll have access to these MCP tools in Cursor:
+
+### `get_motoko_context`
+
+Retrieves relevant Motoko code snippets and documentation from the RAG system based on your query.
+
+**Parameters:**
+
+- `query` (required) - What you're looking for
+- `n_results` (optional) - Number of matches to return (1-5, default: 5)
+
+**Example usage:**
+
+```
+"How do I create a stable variable in Motoko?"
+```
+
+### `generate_motoko_code`
+
+Generates Motoko code using backend RAG context combined with LLM generation.
+
+**Parameters:**
+
+- `query` (required) - Your code generation request
+- `temperature` (optional) - Controls creativity (0-2, default varies by provider)
+- `max_tokens` (optional) - Maximum tokens to generate
+
+**Example usage:**
+
+```
+"Generate a Motoko canister for managing user profiles with CRUD operations"
+```
+
+## 🔧 Troubleshooting
+
+### MCP Tools Not Showing Up
+
+If the MCP server shows "No tools, prompts, or resources" after restarting Cursor:
+
+1. **Try global installation:**
+
+   ```bash
+   npm install -g @q3labs/icp-coder
+   ```
+
+2. **Update your config:**
+
+   ```json
+   {
+     "mcpServers": {
+       "icp-coder": {
+         "command": "icp-coder",
+         "args": [],
+         "env": {
+           "API_KEY": "your-api-key-here",
+           "BACKEND_URL": "https://icp-coder.q3labs.io"
+         }
+       }
+     }
+   }
+   ```
+
+### Node.js Version
+
+This package requires **Node.js 22.0.0 or higher**. Check your version:
+
+```bash
+node --version
+```
+
+## 📚 How It Works
+
+1. **You ask a question** about Motoko in your IDE
+2. **Context retrieval** searches the ChromaDB vector store for relevant code examples and documentation
+3. **LLM generation** combines the retrieved context with your prompt
+4. **Smart response** returns context-aware code suggestions directly in Cursor
+
+```
+┌─────────────┐
+│   Cursor    │  Your IDE
+└──────┬──────┘
+       │ MCP Protocol
+┌──────▼──────┐
+│ ICP Coder   │  MCP Server (this package)
+│ MCP Server  │
+└──────┬──────┘
+       │ HTTP/REST
+┌──────▼──────┐
+│  Backend    │  Go API + Python RAG
+│  ChromaDB   │  Vector Store + LLM
+└─────────────┘
+```
+
+## 🌟 Use Cases
+
+- **Learning Motoko** - Get instant examples and documentation
+- **Building Canisters** - Generate boilerplate code for common patterns
+- **Debugging** - Find similar code examples to solve issues
+- **Best Practices** - Learn from 40+ curated Motoko samples
+
+## 📖 Documentation
+
+For complete documentation including:
+
+- Backend setup and local development
+- Contributing guidelines
+- Architecture diagrams
+- Advanced configuration
+
+Visit the **[main repository](https://github.com/Quantum3-Labs/icp-coder#readme)**.
+
+## 🤝 Support
 
 - **Issues**: [GitHub Issues](https://github.com/Quantum3-Labs/icp-coder/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Quantum3-Labs/icp-coder/discussions)
-- **Documentation**: [Project README](https://github.com/Quantum3-Labs/icp-coder#readme)
+- **Repository**: [Quantum3-Labs/icp-coder](https://github.com/Quantum3-Labs/icp-coder)
+
+## 📄 License
+
+MIT License - see [LICENSE](https://github.com/Quantum3-Labs/icp-coder/blob/main/LICENSE) file for details.
+
+---
+
+Built with ❤️ by [Quantum3 Labs](https://github.com/Quantum3-Labs) for the Internet Computer ecosystem.

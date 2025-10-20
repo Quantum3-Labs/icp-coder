@@ -67,13 +67,68 @@ make up
 
 Set `PUBLIC_BACKEND_URL` to the URL where the backend is reachable. Use `http://localhost:8080` for local development and `https://icp-coder.q3labs.io` (or your production domain) when deploying so the Swagger UI points to the correct host.
 
-**Important**: 
-  - Only set one LLM provider and its key at a time.
-  - Make sure to update the values in `.env` with your actual credentials before running `make up`.
+**Important**:
 
-### 2. Node MCP Server Setup
+- Only set one LLM provider and its key at a time.
+- Make sure to update the values in `.env` with your actual credentials before running `make up`.
 
-Navigate to the mcp_server directory and build the TypeScript server:
+### 2. Generate API Key
+
+Once the backend is running, navigate to the Swagger UI to register an account and generate an API key:
+
+1. Open your browser and go to: **<http://localhost:8080/swagger/index.html>** (or `https://icp-coder.q3labs.io/swagger/index.html` for production)
+2. Register a new account using the `/api/v1/auth/register` endpoint
+3. Login with your credentials using the `/api/v1/auth/login` endpoint
+4. Generate an API key from the `/api/v1/keys` endpoint
+5. Save the API key for use in your IDE configuration below
+
+### 3. Configure MCP Server in Cursor
+
+The ICP Coder MCP server is available as an npm package `@q3labs/icp-coder`. This is the **recommended way** to use the MCP server.
+
+Add the following configuration to your Cursor MCP settings file (`~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "icp-coder": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@q3labs/icp-coder"
+      ],
+      "env": {
+        "API_KEY": "your-api-key-here",
+        "BACKEND_URL": "https://icp-coder.q3labs.io"
+      }
+    }
+  }
+}
+```
+
+**Important:**
+
+- Replace `your-api-key-here` with the API key you generated in step 2
+- Use `https://icp-coder.q3labs.io` for production (recommended)
+- Use `http://localhost:8080` if running the backend locally
+
+After adding the configuration, **completely restart Cursor** for the changes to take effect.
+
+#### Available MCP Tools
+
+Once configured, the following tools will be available in Cursor:
+
+1. **`get_motoko_context`** - Retrieves relevant Motoko code snippets and documentation from the RAG system
+2. **`generate_motoko_code`** - Generates Motoko code using backend RAG context and the configured LLM provider
+
+---
+
+### Alternative Setup Options
+
+<details>
+<summary><b>Using Local Development Version</b> (for contributors)</summary>
+
+If you're developing the MCP server locally, first build it:
 
 ```bash
 cd mcp_server
@@ -81,18 +136,7 @@ npm install
 npm run build
 ```
 
-### 3. Generate API Key
-
-Once the backend is running, navigate to the Swagger UI to register an account and generate an API key:
-
-1. Open your browser and go to: **<http://localhost:8080/swagger/index.html>**
-2. Register a new account
-3. Login with your credentials
-4. Generate an API key (save this for the next step)
-
-### 4. Configure MCP Server in Cursor
-
-Add the following configuration to your Cursor MCP settings:
+Then configure Cursor to use the built files from your `mcp_server` directory:
 
 ```json
 {
@@ -100,16 +144,48 @@ Add the following configuration to your Cursor MCP settings:
     "icp-coder": {
       "command": "node",
       "args": [
-        "ABSOLUTE_PATH_TO_MCP_SERVER_dist/index.js"
+        "/absolute/path/to/icp-coder/mcp_server/dist/index.js"
       ],
       "env": {
-        "API_KEY": "YOUR_API_KEY_FROM_STEP_3",
+        "API_KEY": "your-api-key-here",
         "BACKEND_URL": "http://localhost:8080"
       }
     }
   }
 }
 ```
+
+Replace `/absolute/path/to/icp-coder/` with your actual project path.
+
+</details>
+
+<details>
+<summary><b>Troubleshooting: MCP Tool Not Working</b></summary>
+
+If the MCP server shows "No tools, prompts, or resources" after restarting Cursor, try installing the package globally:
+
+```bash
+npm install -g @q3labs/icp-coder
+```
+
+Then update your config to use the global installation:
+
+```json
+{
+  "mcpServers": {
+    "icp-coder": {
+      "command": "icp-coder",
+      "args": [],
+      "env": {
+        "API_KEY": "your-api-key-here",
+        "BACKEND_URL": "https://icp-coder.q3labs.io"
+      }
+    }
+  }
+}
+```
+
+</details>
 
 ## Development Mode
 
@@ -133,6 +209,7 @@ make dev-down
 ```
 
 **Development features:**
+
 - Automatic rebuild on code changes using Air
 - Debug mode with verbose logging
 - Source code mounted as volume for instant changes
