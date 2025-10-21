@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { registerGetMotokoContext } from './tools/get-motoko-context.tool.js'
 import { registerGenerateMotokoCode } from './tools/generate-motoko-code.tool.js'
+import { registerDfxInfo } from './tools/dfx-info.tool.js'
 
 const PACKAGE_NAME = 'icp-coder-mcp-server'
 const VERSION = '0.1.1'
@@ -25,6 +26,7 @@ async function start(options: StartOptions = {}) {
   const server = new McpServer({ name: PACKAGE_NAME, version: VERSION })
   registerGetMotokoContext(server, { apiKey, baseUrl: backendBaseUrl })
   registerGenerateMotokoCode(server, { apiKey, baseUrl: backendBaseUrl })
+  registerDfxInfo(server)
   const transport = new StdioServerTransport()
   console.error(`[${PACKAGE_NAME}] starting MCP server (v${VERSION}) on stdio...`)
   await server.connect(transport)
