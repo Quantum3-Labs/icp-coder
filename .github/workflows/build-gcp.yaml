@@ -1,0 +1,88 @@
+name: Build and Push to Artifact Registry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_REGION: asia-southeast1
+  ARTIFACT_REGISTRY_LOCATION: asia-southeast1
+  GCP_PROJECT: icp-coder
+  ARTIFACT_REGISTRY_REPO: icp-coder
+
+jobs:
+  check-commit:
+    runs-on: ubuntu-latest
+    outputs:
+      ENVIRONMENT: ${{ steps.check_commit.outputs.ENVIRONMENT }}
+      REPO_NAME: ${{ steps.check_commit.outputs.REPO_NAME }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Environment
+        id: check_commit
+        run: |
+          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
+
+          # Set environment based on branch
+          if [[ "$CURRENT_BRANCH" == "main" ]]; then
+            echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=prod" >> "$GITHUB_OUTPUT"
+          elif [[ "$CURRENT_BRANCH" == "stg" ]]; then
+            echo "ENVIRONMENT=stg" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=stg" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Workflow can only run on main or stg branches"
+            exit 1
+          fi
+
+          # Set repository name
+          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
+          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    needs: check-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev
+
+      - name: Build, Tag, and Push Docker Image
+        env:
+          REPO_NAME: ${{ needs.check-commit.outputs.REPO_NAME }}
+          ENVIRONMENT: ${{ needs.check-commit.outputs.ENVIRONMENT }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_BASE="${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${REPO_NAME}"
+
+          # Build image
+          docker build -f backend/Dockerfile -t ${IMAGE_BASE}:${IMAGE_TAG}-${ENVIRONMENT} backend
+
+          # Push with SHA tag
+          docker push ${IMAGE_BASE}:${IMAGE_TAG}-${ENVIRONMENT}
+
+          # Tag and push with latest tag
+          docker tag ${IMAGE_BASE}:${IMAGE_TAG}-${ENVIRONMENT} ${IMAGE_BASE}:latest-${ENVIRONMENT}
+          docker push ${IMAGE_BASE}:latest-${ENVIRONMENT}
+
+          echo "Successfully pushed image: ${IMAGE_BASE}:${IMAGE_TAG}-${ENVIRONMENT}"
+          echo "Successfully pushed image: ${IMAGE_BASE}:latest-${ENVIRONMENT}"
