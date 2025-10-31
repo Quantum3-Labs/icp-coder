@@ -77,19 +77,37 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Output Image Details
+      - name: Verify and Display Image Tags
         if: success()
         run: |
           echo "Docker image built and pushed successfully!"
           echo ""
           echo "Image Digest: ${{ steps.docker_build.outputs.digest }}"
           echo ""
-          echo "Image Tags:"
-          echo "${{ steps.docker_build.outputs.metadata }}" | jq -r '.["image.name"]'
-          echo ""
           echo "Environment: ${{ needs.check-commit.outputs.ENVIRONMENT }}"
           echo "Repository: ${{ needs.check-commit.outputs.REPO_NAME }}"
           echo "Commit SHA: ${{ github.sha }}"
+          echo ""
+          echo "================================================"
+          echo "Verifying images in Artifact Registry..."
+          echo "================================================"
+
+          # List all images for this repository
+          echo ""
+          echo "All images in repository:"
+          gcloud artifacts docker images list \
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ needs.check-commit.outputs.REPO_NAME }} \
+            --include-tags \
+            --format="table(package,version,tags,create_time)" \
+            --sort-by=~CREATE_TIME \
+            --limit=10
+
+          echo ""
+          echo "================================================"
+          echo "Tags created in this build:"
+          echo "  - ${{ needs.check-commit.outputs.REPO_NAME }}:${{ github.sha }}-${{ needs.check-commit.outputs.ENVIRONMENT }}"
+          echo "  - ${{ needs.check-commit.outputs.REPO_NAME }}:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}"
+          echo "================================================"
 
       - name: Notify Build Failure
         if: failure()
