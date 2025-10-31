@@ -61,6 +61,9 @@ jobs:
         run: |
           gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and Push Docker Image
         id: docker_build
         uses: docker/build-push-action@v6
