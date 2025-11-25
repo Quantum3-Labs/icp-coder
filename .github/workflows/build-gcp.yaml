@@ -2,6 +2,10 @@ name: Build and Push to Artifact Registry
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or tag to build (defaults to the workflow ref)"
+        required: false
 
 permissions:
   contents: read
@@ -10,8 +14,10 @@ permissions:
 env:
   GCP_REGION: asia-southeast1
   ARTIFACT_REGISTRY_LOCATION: asia-southeast1
-  GCP_PROJECT: icp-coder
-  ARTIFACT_REGISTRY_REPO: icp-coder
+  # Artifact Registry lives in the host shared-infra project
+  GCP_PROJECT: q3labs-shared-infra
+  ARTIFACT_REGISTRY_REPO: docker-images
+  IMAGE_NAME: icp-coder
 
 jobs:
   check-commit:
@@ -22,6 +28,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Determine Environment
         id: check_commit
@@ -45,6 +53,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -72,8 +82,8 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ needs.check-commit.outputs.REPO_NAME }}:${{ github.sha }}-${{ needs.check-commit.outputs.ENVIRONMENT }}
-            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ needs.check-commit.outputs.REPO_NAME }}:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}-${{ needs.check-commit.outputs.ENVIRONMENT }}
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }}:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -96,7 +106,7 @@ jobs:
           echo ""
           echo "All images in repository:"
           gcloud artifacts docker images list \
-            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ needs.check-commit.outputs.REPO_NAME }} \
+            ${{ env.ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT }}/${{ env.ARTIFACT_REGISTRY_REPO }}/${{ env.IMAGE_NAME }} \
             --include-tags \
             --format="table(package,version,tags,create_time)" \
             --sort-by=~CREATE_TIME \
@@ -105,8 +115,8 @@ jobs:
           echo ""
           echo "================================================"
           echo "Tags created in this build:"
-          echo "  - ${{ needs.check-commit.outputs.REPO_NAME }}:${{ github.sha }}-${{ needs.check-commit.outputs.ENVIRONMENT }}"
-          echo "  - ${{ needs.check-commit.outputs.REPO_NAME }}:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}"
+          echo "  - ${{ env.IMAGE_NAME }}:${{ github.sha }}-${{ needs.check-commit.outputs.ENVIRONMENT }}"
+          echo "  - ${{ env.IMAGE_NAME }}:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}"
           echo "================================================"
 
       - name: Notify Build Failure
