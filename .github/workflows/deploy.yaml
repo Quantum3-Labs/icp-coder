@@ -1,109 +1,94 @@
-name: Deploy to ECS
+name: Deploy to Cloud Run (Staging)
 
 on:
   workflow_dispatch:
+    inputs:
+      image:
+        description: "Full image URI (leave empty for latest)"
+        required: false
+      service_name:
+        description: "Cloud Run service name (default: repo name)"
+        required: false
+  workflow_call:
+    inputs:
+      image:
+        description: "Full image URI to deploy"
+        required: true
+        type: string
+      service_name:
+        description: "Cloud Run service name"
+        required: true
+        type: string
 
 env:
-  AWS_REGION: ap-southeast-1
-  ECS_CLUSTER: prodCluster
+  REGION: asia-southeast1
+  WIF_POOL: wif-staging-apps-pool
+  WIF_PROVIDER: wif-staging-apps-provider
+  GCP_PROJECT_ID: staging-apps-482206
+  GCP_PROJECT_NUMBER: "871482515924"
 
 jobs:
-  check-commit:
-    runs-on: ubuntu-latest
-    outputs:
-      ENVIRONMENT: ${{ steps.check_commit.outputs.ENVIRONMENT }}
-      REPO_NAME: ${{ steps.check_commit.outputs.REPO_NAME }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Determine Environment & Check Commit Message
-        id: check_commit
-        run: |
-          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
-          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
-          
-          # Set environment based on branch
-          if [[ "$CURRENT_BRANCH" == "main" ]]; then
-            echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
-            echo "ENVIRONMENT=prod" >> "$GITHUB_OUTPUT"
-          elif [[ "$CURRENT_BRANCH" == "stg" ]]; then
-            echo "ENVIRONMENT=stg" >> "$GITHUB_ENV"
-            echo "ENVIRONMENT=stg" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::Workflow can only run on main or stg branches"
-            exit 1
-          fi
-          
-          # Set repository name
-          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
-          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
-
   deploy:
-    needs: check-commit
+    name: Deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Get Latest Image URI
+      - name: Resolve service name
+        id: svc
         run: |
-          REGISTRY=${{ steps.login-ecr.outputs.registry }}
-          REPO_NAME=${{ needs.check-commit.outputs.REPO_NAME }}
-          ENVIRONMENT=${{ needs.check-commit.outputs.ENVIRONMENT }}
-          
-          # Use the latest-{environment} tag
-          IMAGE_URI="${REGISTRY}/${REPO_NAME}:latest-${ENVIRONMENT}"
-          echo "Using image: ${IMAGE_URI}"
-          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+          if [ -n "${{ inputs.service_name }}" ]; then
+            echo "name=${{ inputs.service_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Download Task Definition
+      - name: Resolve image URI
+        id: img
         run: |
-          aws ecs describe-task-definition --task-definition def-${{ needs.check-commit.outputs.ENVIRONMENT }}-${{ needs.check-commit.outputs.REPO_NAME }} --query taskDefinition > task-definition.json
-          
-          # Output the content for debugging
-          cat task-definition.json
+          if [ -n "${{ inputs.image }}" ]; then
+            echo "uri=${{ inputs.image }}" >> $GITHUB_OUTPUT
+          else
+            REPO_NAME=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')
+            echo "uri=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${REPO_NAME}/${{ steps.svc.outputs.name }}:latest" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Update ECS Task Definition with Latest Image
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
+      - uses: google-github-actions/auth@v3
         with:
-          task-definition: task-definition.json
-          container-name: ${{ needs.check-commit.outputs.REPO_NAME }}
-          image: ${{ env.IMAGE_URI }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: "projects/${{ env.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ env.WIF_POOL }}/providers/${{ env.WIF_PROVIDER }}"
+          service_account: "gh-${{ steps.svc.outputs.name }}-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
 
-      - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: service-${{ needs.check-commit.outputs.ENVIRONMENT }}-${{ needs.check-commit.outputs.REPO_NAME }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ steps.svc.outputs.name }} \
+            --image ${{ steps.img.outputs.uri }} \
+            --region ${{ env.REGION }} \
+            --platform managed
 
-      - name: Notify Success to Slack Channel
-        id: slack-success
+      - name: Notify Success
         if: success()
         uses: slackapi/slack-github-action@v1.26.0
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
-          slack-message: "✅ Deployment Successful!\nRepository: ${{ needs.check-commit.outputs.REPO_NAME }}\nEnvironment: ${{ needs.check-commit.outputs.ENVIRONMENT }}\nBuild Status: ${{ job.status }}\nTriggered by: ${{ github.actor }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+          slack-message: |
+            :rocket: *[STG] Deployment Successful*
+            Service: `${{ steps.svc.outputs.name }}` | Branch: ${{ github.ref_name }}
+            Repo: ${{ github.repository }}
+            By: ${{ github.actor }} | ${{ github.event.head_commit.url }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
-      - name: Notify Failure to Slack Channel
-        id: slack-failure
+      - name: Notify Failure
         if: failure()
         uses: slackapi/slack-github-action@v1.26.0
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
-          slack-message: "❌ Deployment Failed!\nRepository: ${{ needs.check-commit.outputs.REPO_NAME }}\nEnvironment: ${{ needs.check-commit.outputs.ENVIRONMENT }}\nBuild Status: ${{ job.status }}\nTriggered by: ${{ github.actor }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+          slack-message: |
+            :x: *[STG] Deployment Failed*
+            Service: `${{ steps.svc.outputs.name }}` | Branch: ${{ github.ref_name }}
+            Repo: ${{ github.repository }}
+            By: ${{ github.actor }} | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
