@@ -7,6 +7,10 @@ on:
         description: "Path to Dockerfile"
         required: false
         default: "Dockerfile"
+      context:
+        description: "Docker build context directory"
+        required: false
+        default: "."
       service_name:
         description: "Cloud Run service name (default: repo name)"
         required: false
@@ -16,6 +20,11 @@ on:
         description: "Path to Dockerfile"
         required: true
         type: string
+      context:
+        description: "Docker build context directory"
+        required: false
+        type: string
+        default: "."
       service_name:
         description: "Cloud Run service name"
         required: true
@@ -89,7 +98,7 @@ jobs:
             --platform linux/amd64 \
             -f ${{ inputs.dockerfile }} \
             -t $IMAGE \
-            .
+            ${{ inputs.context }}
           docker push $IMAGE
           docker tag $IMAGE ${IMAGE%:*}:latest
           docker push ${IMAGE%:*}:latest
