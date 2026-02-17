@@ -1,92 +1,120 @@
-name: Push to ECR
+name: Build and Push to AR
 
 on:
   workflow_dispatch:
+    inputs:
+      dockerfile:
+        description: "Path to Dockerfile"
+        required: false
+        default: "Dockerfile"
+      service_name:
+        description: "Cloud Run service name (default: repo name)"
+        required: false
+  workflow_call:
+    inputs:
+      dockerfile:
+        description: "Path to Dockerfile"
+        required: true
+        type: string
+      service_name:
+        description: "Cloud Run service name"
+        required: true
+        type: string
+    outputs:
+      image:
+        description: "Full image URI"
+        value: ${{ jobs.build.outputs.image }}
+      short_sha:
+        description: "Short commit SHA"
+        value: ${{ jobs.build.outputs.short_sha }}
 
 env:
-  AWS_REGION: ap-southeast-1
+  REGION: asia-southeast1
+  WIF_POOL: wif-deploy-pool
+  WIF_PROVIDER: wif-deploy-provider
 
 jobs:
-  check-commit:
+  build:
+    name: Build & Push
     runs-on: ubuntu-latest
     outputs:
-      ENVIRONMENT: ${{ steps.check_commit.outputs.ENVIRONMENT }}
-      REPO_NAME: ${{ steps.check_commit.outputs.REPO_NAME }}
+      image: ${{ steps.build.outputs.image }}
+      short_sha: ${{ steps.sha.outputs.short_sha }}
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Determine Environment & Check Commit Message
-        id: check_commit
-        run: |
-          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
-          CURRENT_BRANCH=${GITHUB_REF#refs/heads/}
-          
-          # Set environment based on branch
-          if [[ "$CURRENT_BRANCH" == "main" ]]; then
-            echo "ENVIRONMENT=prod" >> "$GITHUB_ENV"
-            echo "ENVIRONMENT=prod" >> "$GITHUB_OUTPUT"
-          elif [[ "$CURRENT_BRANCH" == "stg" ]]; then
-            echo "ENVIRONMENT=stg" >> "$GITHUB_ENV"
-            echo "ENVIRONMENT=stg" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::Workflow can only run on main or stg branches"
-            exit 1
-          fi
-          
-          # Set repository name
-          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_ENV"
-          echo "REPO_NAME=${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
-
-  build-and-push:
-    needs: check-commit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - uses: actions/checkout@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          submodules: true
+          token: ${{ secrets.ORG_GITHUB_TOKEN }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Create ECR Repository if it doesn't exist
+      - name: Resolve service name
+        id: svc
         run: |
-          REPOSITORY="${{ needs.check-commit.outputs.REPO_NAME }}"
-          # Check if repository exists
-          if ! aws ecr describe-repositories --repository-names "$REPOSITORY" >/dev/null 2>&1; then
-            echo "Repository $REPOSITORY does not exist. Creating it..."
-            aws ecr create-repository --repository-name "$REPOSITORY" --image-scanning-configuration scanOnPush=true
-            echo "Repository $REPOSITORY created successfully."
+          if [ -n "${{ inputs.service_name }}" ]; then
+            echo "name=${{ inputs.service_name }}" >> $GITHUB_OUTPUT
           else
-            echo "Repository $REPOSITORY already exists."
+            echo "name=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
           fi
 
-      - name: Download Environment Variables from S3
-        run: |
-          aws s3 cp s3://quantum3labs/${{ needs.check-commit.outputs.REPO_NAME }}.${{ needs.check-commit.outputs.ENVIRONMENT }}.env .env
-          echo "Successfully downloaded environment variables from S3"
+      - name: Create env file
+        run: echo "${{ secrets.ENV_PROD }}" > .env
 
-      - name: Build, Tag, and Push Docker Image to Amazon ECR
-        id: build-image
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: "projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ env.WIF_POOL }}/providers/${{ env.WIF_PROVIDER }}"
+          service_account: "gh-${{ steps.svc.outputs.name }}-sa@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Set short SHA
+        id: sha
+        run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Derive AR repo name
+        id: repo
+        run: echo "name=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
+
+      - name: Build and push image
+        id: build
         env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: ${{ needs.check-commit.outputs.REPO_NAME }}
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE: "${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ steps.repo.outputs.name }}/${{ steps.svc.outputs.name }}:${{ steps.sha.outputs.short_sha }}"
         run: |
-          docker build -f backend/Dockerfile -t $REGISTRY/$REPOSITORY:$IMAGE_TAG-${{ needs.check-commit.outputs.ENVIRONMENT }} backend
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG-${{ needs.check-commit.outputs.ENVIRONMENT }}
-          docker tag $REGISTRY/$REPOSITORY:$IMAGE_TAG-${{ needs.check-commit.outputs.ENVIRONMENT }} $REGISTRY/$REPOSITORY:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}
-          docker push $REGISTRY/$REPOSITORY:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}
-          
-          echo "Successfully pushed image: $REGISTRY/$REPOSITORY:$IMAGE_TAG"
-          echo "Successfully pushed image: $REGISTRY/$REPOSITORY:latest-${{ needs.check-commit.outputs.ENVIRONMENT }}"
-          
-          # For security, remove the .env file
-          rm -f .env
+          docker build \
+            --platform linux/amd64 \
+            -f ${{ inputs.dockerfile }} \
+            -t $IMAGE \
+            .
+          docker push $IMAGE
+          docker tag $IMAGE ${IMAGE%:*}:latest
+          docker push ${IMAGE%:*}:latest
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Notify Success
+        if: success()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          slack-message: |
+            :white_check_mark: *Build Successful*
+            Service: `${{ steps.svc.outputs.name }}` | Image: `${{ steps.sha.outputs.short_sha }}`
+            Repo: ${{ github.repository }} | Branch: ${{ github.ref_name }}
+            By: ${{ github.actor }} | ${{ github.event.head_commit.url }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          slack-message: |
+            :x: *Build Failed*
+            Service: `${{ steps.svc.outputs.name }}` | Branch: ${{ github.ref_name }}
+            Repo: ${{ github.repository }}
+            By: ${{ github.actor }} | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
