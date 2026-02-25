@@ -10,6 +10,13 @@ on:
         options:
           - staging
           - production
+      service_name:
+        description: "Service to build"
+        required: true
+        type: choice
+        options:
+          - icp-coder
+          - icp-coder-api
       dockerfile:
         description: "Path to Dockerfile"
         required: false
@@ -21,11 +28,12 @@ on:
 
 env:
   REGION: asia-southeast1
-  SERVICE_NAME: icp-coder
+  AR_REPO: icp-coder
+  CICD_SA: gh-icp-coder-sa
 
 jobs:
   build:
-    name: Build & Push (${{ inputs.environment }})
+    name: Build ${{ inputs.service_name }} (${{ inputs.environment }})
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.build.outputs.image }}
@@ -66,7 +74,7 @@ jobs:
         with:
           project_id: ${{ steps.env.outputs.project_id }}
           workload_identity_provider: "projects/${{ steps.env.outputs.project_number }}/locations/global/workloadIdentityPools/${{ steps.env.outputs.wif_pool }}/providers/${{ steps.env.outputs.wif_provider }}"
-          service_account: "gh-${{ env.SERVICE_NAME }}-sa@${{ steps.env.outputs.project_id }}.iam.gserviceaccount.com"
+          service_account: "${{ env.CICD_SA }}@${{ steps.env.outputs.project_id }}.iam.gserviceaccount.com"
 
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
@@ -78,7 +86,7 @@ jobs:
       - name: Build and push image
         id: build
         env:
-          IMAGE: "${{ env.REGION }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ env.SERVICE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.sha.outputs.short_sha }}"
+          IMAGE: "${{ env.REGION }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ env.AR_REPO }}/${{ inputs.service_name }}:${{ steps.sha.outputs.short_sha }}"
         run: |
           docker build \
             --platform linux/amd64 \
@@ -97,7 +105,7 @@ jobs:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
             :white_check_mark: *[${{ inputs.environment }}] Build Successful*
-            Service: `${{ env.SERVICE_NAME }}` | Image: `${{ steps.sha.outputs.short_sha }}`
+            Service: `${{ inputs.service_name }}` | Image: `${{ steps.sha.outputs.short_sha }}`
             Repo: ${{ github.repository }} | Branch: ${{ github.ref_name }}
             By: ${{ github.actor }} | ${{ github.event.head_commit.url }}
         env:
@@ -110,7 +118,7 @@ jobs:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
             :x: *[${{ inputs.environment }}] Build Failed*
-            Service: `${{ env.SERVICE_NAME }}` | Branch: ${{ github.ref_name }}
+            Service: `${{ inputs.service_name }}` | Branch: ${{ github.ref_name }}
             Repo: ${{ github.repository }}
             By: ${{ github.actor }} | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         env:
