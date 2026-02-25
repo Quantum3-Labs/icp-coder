@@ -1,8 +1,15 @@
-name: Build and Push to AR (Staging)
+name: Build and Push to AR
 
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
       dockerfile:
         description: "Path to Dockerfile"
         required: false
@@ -11,42 +18,14 @@ on:
         description: "Docker build context directory"
         required: false
         default: "."
-      service_name:
-        description: "Cloud Run service name (default: repo name)"
-        required: false
-  workflow_call:
-    inputs:
-      dockerfile:
-        description: "Path to Dockerfile"
-        required: true
-        type: string
-      context:
-        description: "Docker build context directory"
-        required: false
-        type: string
-        default: "."
-      service_name:
-        description: "Cloud Run service name"
-        required: true
-        type: string
-    outputs:
-      image:
-        description: "Full image URI"
-        value: ${{ jobs.build.outputs.image }}
-      short_sha:
-        description: "Short commit SHA"
-        value: ${{ jobs.build.outputs.short_sha }}
 
 env:
   REGION: asia-southeast1
-  WIF_POOL: wif-staging-apps-pool
-  WIF_PROVIDER: wif-staging-apps-provider
-  GCP_PROJECT_ID: staging-apps-482206
-  GCP_PROJECT_NUMBER: "871482515924"
+  SERVICE_NAME: icp-coder
 
 jobs:
   build:
-    name: Build & Push
+    name: Build & Push (${{ inputs.environment }})
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.build.outputs.image }}
@@ -60,23 +39,34 @@ jobs:
           submodules: true
           token: ${{ secrets.ORG_GITHUB_TOKEN }}
 
-      - name: Resolve service name
-        id: svc
+      - name: Resolve environment config
+        id: env
         run: |
-          if [ -n "${{ inputs.service_name }}" ]; then
-            echo "name=${{ inputs.service_name }}" >> $GITHUB_OUTPUT
+          if [ "${{ inputs.environment }}" = "staging" ]; then
+            echo "project_id=staging-apps-482206" >> $GITHUB_OUTPUT
+            echo "project_number=871482515924" >> $GITHUB_OUTPUT
+            echo "wif_pool=wif-staging-apps-pool" >> $GITHUB_OUTPUT
+            echo "wif_provider=wif-staging-apps-provider" >> $GITHUB_OUTPUT
           else
-            echo "name=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
+            echo "project_id=icp-coder-prod" >> $GITHUB_OUTPUT
+            echo "project_number=839167535209" >> $GITHUB_OUTPUT
+            echo "wif_pool=wif-deploy-pool" >> $GITHUB_OUTPUT
+            echo "wif_provider=wif-deploy-provider" >> $GITHUB_OUTPUT
           fi
 
       - name: Create env file
-        run: echo "${{ secrets.ENV_STG }}" > .env
+        run: |
+          if [ "${{ inputs.environment }}" = "staging" ]; then
+            echo "${{ secrets.ENV_STG }}" > .env
+          else
+            echo "${{ secrets.ENV_PROD }}" > .env
+          fi
 
       - uses: google-github-actions/auth@v3
         with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
-          workload_identity_provider: "projects/${{ env.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ env.WIF_POOL }}/providers/${{ env.WIF_PROVIDER }}"
-          service_account: "gh-${{ steps.svc.outputs.name }}-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+          project_id: ${{ steps.env.outputs.project_id }}
+          workload_identity_provider: "projects/${{ steps.env.outputs.project_number }}/locations/global/workloadIdentityPools/${{ steps.env.outputs.wif_pool }}/providers/${{ steps.env.outputs.wif_provider }}"
+          service_account: "gh-${{ env.SERVICE_NAME }}-sa@${{ steps.env.outputs.project_id }}.iam.gserviceaccount.com"
 
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
@@ -85,14 +75,10 @@ jobs:
         id: sha
         run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      - name: Derive AR repo name
-        id: repo
-        run: echo "name=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
-
       - name: Build and push image
         id: build
         env:
-          IMAGE: "${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ steps.repo.outputs.name }}/${{ steps.svc.outputs.name }}:${{ steps.sha.outputs.short_sha }}"
+          IMAGE: "${{ env.REGION }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ env.SERVICE_NAME }}/${{ env.SERVICE_NAME }}:${{ steps.sha.outputs.short_sha }}"
         run: |
           docker build \
             --platform linux/amd64 \
@@ -110,8 +96,8 @@ jobs:
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
-            :white_check_mark: *[STG] Build Successful*
-            Service: `${{ steps.svc.outputs.name }}` | Image: `${{ steps.sha.outputs.short_sha }}`
+            :white_check_mark: *[${{ inputs.environment }}] Build Successful*
+            Service: `${{ env.SERVICE_NAME }}` | Image: `${{ steps.sha.outputs.short_sha }}`
             Repo: ${{ github.repository }} | Branch: ${{ github.ref_name }}
             By: ${{ github.actor }} | ${{ github.event.head_commit.url }}
         env:
@@ -123,8 +109,8 @@ jobs:
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
-            :x: *[STG] Build Failed*
-            Service: `${{ steps.svc.outputs.name }}` | Branch: ${{ github.ref_name }}
+            :x: *[${{ inputs.environment }}] Build Failed*
+            Service: `${{ env.SERVICE_NAME }}` | Branch: ${{ github.ref_name }}
             Repo: ${{ github.repository }}
             By: ${{ github.actor }} | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         env:
