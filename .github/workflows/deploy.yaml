@@ -1,47 +1,44 @@
-name: Deploy to Cloud Run (Staging)
+name: Deploy to Cloud Run
 
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
       image:
         description: "Full image URI (leave empty for latest)"
         required: false
-      service_name:
-        description: "Cloud Run service name (default: repo name)"
-        required: false
-  workflow_call:
-    inputs:
-      image:
-        description: "Full image URI to deploy"
-        required: true
-        type: string
-      service_name:
-        description: "Cloud Run service name"
-        required: true
-        type: string
 
 env:
   REGION: asia-southeast1
-  WIF_POOL: wif-staging-apps-pool
-  WIF_PROVIDER: wif-staging-apps-provider
-  GCP_PROJECT_ID: staging-apps-482206
-  GCP_PROJECT_NUMBER: "871482515924"
+  SERVICE_NAME: icp-coder
 
 jobs:
   deploy:
-    name: Deploy
+    name: Deploy (${{ inputs.environment }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Resolve service name
-        id: svc
+      - name: Resolve environment config
+        id: env
         run: |
-          if [ -n "${{ inputs.service_name }}" ]; then
-            echo "name=${{ inputs.service_name }}" >> $GITHUB_OUTPUT
+          if [ "${{ inputs.environment }}" = "staging" ]; then
+            echo "project_id=staging-apps-482206" >> $GITHUB_OUTPUT
+            echo "project_number=871482515924" >> $GITHUB_OUTPUT
+            echo "wif_pool=wif-staging-apps-pool" >> $GITHUB_OUTPUT
+            echo "wif_provider=wif-staging-apps-provider" >> $GITHUB_OUTPUT
           else
-            echo "name=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')" >> $GITHUB_OUTPUT
+            echo "project_id=icp-coder-prod" >> $GITHUB_OUTPUT
+            echo "project_number=839167535209" >> $GITHUB_OUTPUT
+            echo "wif_pool=wif-deploy-pool" >> $GITHUB_OUTPUT
+            echo "wif_provider=wif-deploy-provider" >> $GITHUB_OUTPUT
           fi
 
       - name: Resolve image URI
@@ -50,19 +47,18 @@ jobs:
           if [ -n "${{ inputs.image }}" ]; then
             echo "uri=${{ inputs.image }}" >> $GITHUB_OUTPUT
           else
-            REPO_NAME=$(echo '${{ github.repository }}' | cut -d'/' -f2 | sed 's/_app$//' | sed 's/_/-/g')
-            echo "uri=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${REPO_NAME}/${{ steps.svc.outputs.name }}:latest" >> $GITHUB_OUTPUT
+            echo "uri=${{ env.REGION }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ env.SERVICE_NAME }}/${{ env.SERVICE_NAME }}:latest" >> $GITHUB_OUTPUT
           fi
 
       - uses: google-github-actions/auth@v3
         with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
-          workload_identity_provider: "projects/${{ env.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ env.WIF_POOL }}/providers/${{ env.WIF_PROVIDER }}"
-          service_account: "gh-${{ steps.svc.outputs.name }}-sa@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+          project_id: ${{ steps.env.outputs.project_id }}
+          workload_identity_provider: "projects/${{ steps.env.outputs.project_number }}/locations/global/workloadIdentityPools/${{ steps.env.outputs.wif_pool }}/providers/${{ steps.env.outputs.wif_provider }}"
+          service_account: "gh-${{ env.SERVICE_NAME }}-sa@${{ steps.env.outputs.project_id }}.iam.gserviceaccount.com"
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ${{ steps.svc.outputs.name }} \
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image ${{ steps.img.outputs.uri }} \
             --region ${{ env.REGION }} \
             --platform managed
@@ -73,10 +69,10 @@ jobs:
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
-            :rocket: *[STG] Deployment Successful*
-            Service: `${{ steps.svc.outputs.name }}` | Branch: ${{ github.ref_name }}
-            Repo: ${{ github.repository }}
-            By: ${{ github.actor }} | ${{ github.event.head_commit.url }}
+            :rocket: *[${{ inputs.environment }}] Deployed*
+            Service: `${{ env.SERVICE_NAME }}` | Image: `${{ steps.img.outputs.uri }}`
+            Repo: ${{ github.repository }} | Branch: ${{ github.ref_name }}
+            By: ${{ github.actor }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
@@ -86,8 +82,8 @@ jobs:
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
-            :x: *[STG] Deployment Failed*
-            Service: `${{ steps.svc.outputs.name }}` | Branch: ${{ github.ref_name }}
+            :x: *[${{ inputs.environment }}] Deploy Failed*
+            Service: `${{ env.SERVICE_NAME }}` | Branch: ${{ github.ref_name }}
             Repo: ${{ github.repository }}
             By: ${{ github.actor }} | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         env:
