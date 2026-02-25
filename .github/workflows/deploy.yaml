@@ -10,17 +10,25 @@ on:
         options:
           - staging
           - production
+      service_name:
+        description: "Service to deploy"
+        required: true
+        type: choice
+        options:
+          - icp-coder
+          - icp-coder-api
       image:
         description: "Full image URI (leave empty for latest)"
         required: false
 
 env:
   REGION: asia-southeast1
-  SERVICE_NAME: icp-coder
+  AR_REPO: icp-coder
+  CICD_SA: gh-icp-coder-sa
 
 jobs:
   deploy:
-    name: Deploy (${{ inputs.environment }})
+    name: Deploy ${{ inputs.service_name }} (${{ inputs.environment }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -47,18 +55,18 @@ jobs:
           if [ -n "${{ inputs.image }}" ]; then
             echo "uri=${{ inputs.image }}" >> $GITHUB_OUTPUT
           else
-            echo "uri=${{ env.REGION }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ env.SERVICE_NAME }}/${{ env.SERVICE_NAME }}:latest" >> $GITHUB_OUTPUT
+            echo "uri=${{ env.REGION }}-docker.pkg.dev/${{ steps.env.outputs.project_id }}/${{ env.AR_REPO }}/${{ inputs.service_name }}:latest" >> $GITHUB_OUTPUT
           fi
 
       - uses: google-github-actions/auth@v3
         with:
           project_id: ${{ steps.env.outputs.project_id }}
           workload_identity_provider: "projects/${{ steps.env.outputs.project_number }}/locations/global/workloadIdentityPools/${{ steps.env.outputs.wif_pool }}/providers/${{ steps.env.outputs.wif_provider }}"
-          service_account: "gh-${{ env.SERVICE_NAME }}-sa@${{ steps.env.outputs.project_id }}.iam.gserviceaccount.com"
+          service_account: "${{ env.CICD_SA }}@${{ steps.env.outputs.project_id }}.iam.gserviceaccount.com"
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
+          gcloud run deploy ${{ inputs.service_name }} \
             --image ${{ steps.img.outputs.uri }} \
             --region ${{ env.REGION }} \
             --platform managed
@@ -70,7 +78,7 @@ jobs:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
             :rocket: *[${{ inputs.environment }}] Deployed*
-            Service: `${{ env.SERVICE_NAME }}` | Image: `${{ steps.img.outputs.uri }}`
+            Service: `${{ inputs.service_name }}` | Image: `${{ steps.img.outputs.uri }}`
             Repo: ${{ github.repository }} | Branch: ${{ github.ref_name }}
             By: ${{ github.actor }}
         env:
@@ -83,7 +91,7 @@ jobs:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           slack-message: |
             :x: *[${{ inputs.environment }}] Deploy Failed*
-            Service: `${{ env.SERVICE_NAME }}` | Branch: ${{ github.ref_name }}
+            Service: `${{ inputs.service_name }}` | Branch: ${{ github.ref_name }}
             Repo: ${{ github.repository }}
             By: ${{ github.actor }} | ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         env:
